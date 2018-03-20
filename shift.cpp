@@ -12,28 +12,48 @@ void shift(DataType tensor[D][D][M],
 #pragma HLS INTERFACE s_axilite port=tensor bundle=control
 #pragma HLS INTERFACE s_axilite port=act bundle=control
 
-		const int Dx[M]={
-#include "dx"
-		};
-		const int Dy[M]={
-#include "dy"
-		};
-		const DataType p[M][N]={
-#include "p"
-		};
+	const int Dx1[M]={
+	#include "dx1"
+			};
+			const int Dy1[M]={
+	#include "dy1"
+			};
+			const DataType p1[M][K]={
+	#include "p1"
+			};
 
-		const DataType ave[N]={
-#include "ave"
-		};
-		const DataType std[N]={
-#include "std"
-		};
+			const DataType ave1[K]={
+	#include "ave1"
+			};
+			const DataType std1[K]={
+	#include "std1"
+			};
 
-#pragma HLS DATAFLOW
-		DataType fmap[nD][nD][N];
+		DataType fmap1[D][D][K];
+		DataType out1[D][D][K];
+		_shift_n<DataType, D, M, K>(tensor, fmap1, Dx1, Dy1, p1);
+		_norm_relu<DataType, D, K>(fmap1,ave1,std1, out1);
 
-		_shift_s<DataType, D, M, N, S>(tensor, fmap, Dx, Dy, p);
-		_norm_relu<DataType, nD, N>(fmap,ave,std, act);
+		const int Dx2[K]={
+	#include "dx2"
+				};
+				const int Dy2[K]={
+	#include "dy2"
+				};
+				const DataType p2[K][N]={
+	#include "p2"
+				};
+
+				const DataType ave2[N]={
+	#include "ave2"
+				};
+				const DataType std2[N]={
+	#include "std2"
+				};
+
+		DataType fmap2[nD][nD][N];
+		_shift_s<DataType, D, K, N, S>(out1, fmap2, Dx2, Dy2, p2);
+		_norm_relu<DataType, nD, N>(fmap2, ave2,std2, act);
 }
 
 

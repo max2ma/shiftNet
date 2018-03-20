@@ -13,6 +13,7 @@ typedef float DataType;
 namespace para{
 	const int D = 8;
 	const int M = 2;
+	const int K = 4;
 	const int N = 4;
 	const int S = 1;
 	const int nD = (D - 1)/S + 1;
