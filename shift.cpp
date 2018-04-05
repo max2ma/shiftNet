@@ -24,17 +24,7 @@ void shift(hls::stream<DataType> & tensor,
 		};
 
 #pragma HLS DATAFLOW
-		hls::stream<DataType> f_conv0, f_shift,f_conv1, f_pool;
-#pragma HLS STREAM variable=f_shift depth=1 dim=1
-#pragma HLS STREAM variable=f_conv0 depth=1 dim=1
-#pragma HLS STREAM variable=f_pool depth=1 dim=1
-#pragma HLS STREAM variable=f_conv1 depth=1 dim=1
-
-		_linear_combination<DataType,D, C, M>(tensor, f_conv0, p0);
-		_shift_3x3<DataType, D, M, S>(f_conv0, f_shift, Dx, Dy);
-		_linear_combination<DataType,nD, M, N>(f_shift, f_conv1, p1);
-		_max_pool<DataType, nD, N, 2>(f_conv1,f_pool);
-		_relu<DataType, nD/2, N>(f_pool, act);
+		_shift<DataType, D, 1, 2, 2, C, M, N>(tensor, act, Dx, Dy,p0,p1);
 }
 
 
