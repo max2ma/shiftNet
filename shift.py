@@ -45,80 +45,45 @@ def shift(tensor, kx, ky):
 				out[i, j, k] = tensor[di, dj, k]
 	return out
 
-def linear_cb(tensor, p):
-	dimT = tensor.shape
-	dimP = p.shape
-	assert(tensor.ndim == 3)
-	assert(p.ndim == 2)
-	assert(dimT[2] == dimP[0])
-	act = np.zeros([dimT[0],dimT[1], dimP[1]])
-	for i in range(dimT[0]):
-		for j in range(dimT[1]):
-			for n in range(dimP[1]):
-				for k in range(dimT[2]):
-					act[i, j, n] = act[i, j, n] + p[k, n] * tensor[i, j, k]
-	return act
-
-def Relu(tensor,ave,std):
-	dim = tensor.shape
-	dimA = ave.shape
-	dimD = std.shape
-	assert(tensor.ndim == 3)
-	assert(ave.ndim == 1)
-	assert(std.ndim == 1)
-	assert(dim[2] == dimA[0] == dimD[0])
-	re = np.zeros(dim)
-	for i in range(dim[0]):
-		for j in range(dim[1]):
-			for n in range(dim[2]):
-				norm = (tensor[i,j,n] - ave[n])/std[n]
-				re[i,j,n] = max(norm, 0)
-	return re
 
 def main():
 	D = 9
-	M = 16
-	N = 8
+	C = 3
+	M = 8
+	N = 16
 
 	Dx, Dy, k_shift = choice(M)
 	np.savetxt("dx", Dx.reshape([1, -1]), delimiter=',', fmt='%d')
 	np.savetxt("dy", Dy.reshape([1, -1]), delimiter=',', fmt='%d')
 
 
-	tensor = np.random.rand(D, D, M)
+	tensor = np.random.rand(D, D, C)
 	
 	np.savetxt("input", tensor.reshape([1, -1]), delimiter=',')
 	
-	p = np.random.rand(M, N)
-	np.savetxt("p", p.reshape([1, -1]), delimiter=',')
-
-
-	gensor = shift(tensor, Dx, Dy)
-	np.savetxt("g", gensor.reshape([1, -1]), delimiter=',')
-
-	act = linear_cb(gensor, p)
-	np.savetxt("fmap", act.reshape([1, -1]), delimiter=',')
-	fmap = act.reshape([D*D, N])
-	ave = np.mean(fmap, axis = 0)
-	std = np.std(fmap, axis = 0);
-	np.savetxt("ave", ave.reshape([1, -1]), delimiter=',')
-	np.savetxt("std", std.reshape([1, -1]), delimiter=',')
-	out = Relu(act, ave,std)
-	np.savetxt("ref", out.reshape([1, -1]), delimiter=',')
+	p0 = np.random.rand(C, M)
+	np.savetxt("p0", p0.reshape([1, -1]), delimiter=',')
+	
+	p1 = np.random.rand( M, N)
+	np.savetxt("p1", p1.reshape([1, -1]), delimiter=',')
 
 
 	g =tf.Graph()
 	with g.as_default():
-		t_im = tf.constant(tensor, dtype=tf.float32, shape=[1,D,D,M])
-		p_conv = tf.constant(p, dtype=tf.float32, shape=[1,1,M, N])
+		t_im = tf.constant(tensor, dtype=tf.float32, shape=[1,D,D,C])
+		p0_conv = tf.constant(p0, dtype=tf.float32, shape=[1,1,C, M])
+		p1_conv = tf.constant(p1, dtype=tf.float32, shape=[1,1, M, N])
 		kernel = tf.constant(k_shift, shape=[3,3,M, M])
-		t_shift = tf.nn.conv2d(t_im, k_shift, strides=[1,1,1,1], padding="SAME")
-		t_conv = tf.nn.conv2d(t_shift,p_conv,strides=[1,1,1,1], padding="SAME")
-		t_pool = tf.nn.max_pool(t_conv,[1, 2, 2, 1],[1,2,2,1], "VALID")
+		t_conv0 = tf.nn.conv2d(t_im,p0_conv,strides=[1,1,1,1], padding="SAME")
+		t_shift = tf.nn.conv2d(t_conv0, k_shift, strides=[1,1,1,1], padding="SAME")
+		t_conv1 = tf.nn.conv2d(t_shift,p1_conv,strides=[1,1,1,1], padding="SAME")
+		t_pool = tf.nn.max_pool(t_conv1,[1, 2, 2, 1],[1,2,2,1], "VALID")
 		t_relu = tf.nn.relu(t_pool)
 	with tf.Session(graph=g) as sess:
-		t_gen = t_pool.eval()
-		np.savetxt("pool", t_gen.reshape([1, -1]), delimiter=',')
+		t_gen,t_po, t_map = sess.run([t_relu, t_pool, t_conv1])
+		np.savetxt("relu", t_gen.reshape([1, -1]), delimiter=',')
+		np.savetxt("fmap", t_map.reshape([1, -1]), delimiter=',')
+		np.savetxt("pool", t_po.reshape([1, -1]), delimiter=',')
 
 if __name__ == "__main__":
 	main()
