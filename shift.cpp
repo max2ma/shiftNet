@@ -24,7 +24,7 @@ void shift(hls::stream<DataType> & tensor,
 		};
 
 #pragma HLS DATAFLOW
-		_shift<DataType, D, 1, 2, 2, C, M, N>(tensor, act, Dx, Dy,p0,p1);
+		_shift<DataType, D, sS, cS, mS, C, M, N>(tensor, act, Dx, Dy,p0,p1);
 }
 
 
