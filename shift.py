@@ -47,7 +47,7 @@ def shift(tensor, kx, ky):
 
 
 def main():
-	D = 9
+	D = 11
 	C = 3
 	M = 8
 	N = 16
@@ -74,13 +74,14 @@ def main():
 		p0_conv = tf.constant(p0, dtype=tf.float32, shape=[1,1,C, M])
 		p1_conv = tf.constant(p1, dtype=tf.float32, shape=[1,1, M, N])
 		kernel = tf.constant(k_shift, shape=[3,3,M, M])
-		t_conv0 = tf.nn.conv2d(t_im,p0_conv,strides=[1,1,1,1], padding="SAME")
+		t_conv0 = tf.nn.conv2d(t_im,p0_conv,strides=[1,1,1,1], padding="VALID")
 		t_shift = tf.nn.conv2d(t_conv0, k_shift, strides=[1,1,1,1], padding="SAME")
-		t_conv1 = tf.nn.conv2d(t_shift,p1_conv,strides=[1,1,1,1], padding="SAME")
+		t_conv1 = tf.nn.conv2d(t_shift,p1_conv,strides=[1,2,2,1], padding="VALID")
 		t_pool = tf.nn.max_pool(t_conv1,[1, 2, 2, 1],[1,2,2,1], "VALID")
 		t_relu = tf.nn.relu(t_pool)
 	with tf.Session(graph=g) as sess:
 		t_gen,t_po, t_map = sess.run([t_relu, t_pool, t_conv1])
+		print(t_map.shape)
 		np.savetxt("relu", t_gen.reshape([1, -1]), delimiter=',')
 		np.savetxt("fmap", t_map.reshape([1, -1]), delimiter=',')
 		np.savetxt("pool", t_po.reshape([1, -1]), delimiter=',')
