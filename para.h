@@ -11,9 +11,12 @@ typedef ap_fixed<16, 4> DataType;
 typedef float DataType;
 #endif
 namespace para{
-	const int D = 8;
-	const int M = 2;
-	const int N = 4;
-	const int S = 1;
-	const int nD = (D - 1)/S + 1;
+	const int D = 11;
+	const int C = 3;
+	const int M = 8;
+	const int N = 16;
+	const int sS = 1;
+	const int cS = 2;
+	const int mS = 2;
+	const int nD = (D - 1)/sS/cS/mS + 1;
 }
