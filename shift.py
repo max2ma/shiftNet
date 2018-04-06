@@ -5,7 +5,7 @@ def choice(size):
 	dx = np.zeros(size, dtype=np.int)
 	dy = np.zeros(size, dtype=np.int)
 	k = np.zeros([3,3, size, size], dtype=np.int)
-	choice = np.array([-2, -1,0,1, 2]);
+	choice = np.array([-2, -1,0,1, 2], dtype=np.int);
 	d = np.random.choice(choice, size=size)
 	for i in range(size):
 		if d[i] == -2:
@@ -28,7 +28,7 @@ def choice(size):
 			dx[i] = 0
 			dy[i] = 1
 			k[1][0][i][i] = 1
-	return dx, dy, k
+	return d, k
 
 def shift(tensor, kx, ky):
 	dim = tensor.shape
@@ -52,9 +52,8 @@ def main():
 	M = 8
 	N = 16
 
-	Dx, Dy, k_shift = choice(M)
-	np.savetxt("dx", Dx.reshape([1, -1]), delimiter=',', fmt='%d')
-	np.savetxt("dy", Dy.reshape([1, -1]), delimiter=',', fmt='%d')
+	Dx, k_shift = choice(M)
+	np.savetxt("d", Dx.reshape([1, -1]), delimiter=',', fmt='%d')
 
 
 	tensor = np.random.rand(D, D, C)
@@ -68,23 +67,28 @@ def main():
 	np.savetxt("p1", p1.reshape([1, -1]), delimiter=',')
 
 
+	def block(idx ,fmap, in_c, out_c, ex,  stride):
+		p0 = np.random.rand(1, 1, in_c, in_c * ex)
+		np.savetxt("p0_%d"%idx, p0.reshape([1, -1]), delimiter=',')
+		t_conv0 = tf.nn.relu(tf.nn.conv2d(fmap,p0,strides=[1,1,1,1],
+					padding="VALID"))
+		d, k_shift = choice(in_c * ex)
+		np.savetxt("d_%d"%idx, d.reshape([1, -1]), delimiter=',', fmt='%d')
+		t_shift = tf.nn.conv2d(t_conv0, k_shift, strides=[1,1,1,1], padding="SAME")
+		p1 = np.random.rand(1, 1, in_c * ex, out_c)
+		np.savetxt("p1_%d"%idx, p1.reshape([1, -1]), delimiter=',')
+		t_act = tf.nn.relu(tf.nn.conv2d(t_shift,p1,strides=[1,stride, stride,1],
+					padding="VALID"), name="block_%d"%idx)
+		return t_act
+
+
 	g =tf.Graph()
 	with g.as_default():
 		t_im = tf.constant(tensor, dtype=tf.float32, shape=[1,D,D,C])
-		p0_conv = tf.constant(p0, dtype=tf.float32, shape=[1,1,C, M])
-		p1_conv = tf.constant(p1, dtype=tf.float32, shape=[1,1, M, N])
-		kernel = tf.constant(k_shift, shape=[3,3,M, M])
-		t_conv0 = tf.nn.conv2d(t_im,p0_conv,strides=[1,1,1,1], padding="VALID")
-		t_shift = tf.nn.conv2d(t_conv0, k_shift, strides=[1,1,1,1], padding="SAME")
-		t_conv1 = tf.nn.conv2d(t_shift,p1_conv,strides=[1,2,2,1], padding="VALID")
-		t_pool = tf.nn.max_pool(t_conv1,[1, 2, 2, 1],[1,2,2,1], "VALID")
-		t_relu = tf.nn.relu(t_pool)
+		t_act = block(0, t_im, C, N, 2, 2)
 	with tf.Session(graph=g) as sess:
-		t_gen,t_po, t_map = sess.run([t_relu, t_pool, t_conv1])
-		print(t_map.shape)
-		np.savetxt("relu", t_gen.reshape([1, -1]), delimiter=',')
-		np.savetxt("fmap", t_map.reshape([1, -1]), delimiter=',')
-		np.savetxt("pool", t_po.reshape([1, -1]), delimiter=',')
+		t_gen= sess.run(t_act)
+		np.savetxt("t_act", t_gen.reshape([1, -1]), delimiter=',')
 
 if __name__ == "__main__":
 	main()

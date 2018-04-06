@@ -13,10 +13,10 @@ typedef float DataType;
 namespace para{
 	const int D = 11;
 	const int C = 3;
-	const int M = 8;
+	const int E = 2;
 	const int N = 16;
 	const int sS = 1;
 	const int cS = 2;
 	const int mS = 2;
-	const int nD = (D - 1)/sS/cS/mS + 1;
+	const int nD = (D - 1)/sS/cS + 1;
 }

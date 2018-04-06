@@ -15,7 +15,7 @@ int main(){
 	};
 
 	float ref[nD][nD][N] = {
-#include "relu"
+#include "t_act"
 	};
 
 
