@@ -20,8 +20,7 @@ void _relu(hls::stream<T>& fmap, hls::stream<T>& act){
 
 template<typename T, int D, int C, int S>
 void _shift_3x3(hls::stream<T>& fmap, hls::stream<T>& act,
-		const int Dx[C],
-		const int Dy[C]){
+		const int Dx[C]){
 	static const int nD = (D - 1)/S + 1;
 	T buffer[2][D][C];
 #pragma HLS ARRAY_PARTITION variable=buffer complete dim=1
@@ -46,35 +45,33 @@ void _shift_3x3(hls::stream<T>& fmap, hls::stream<T>& act,
 				int ci = i & 0x01;
 				int ni = ci ^ 0x01;
 
-				switch(Dy[k]){
+				switch(Dx[k]){
 					case 0:
-						switch(Dx[k]){
-							case 0:
-								w = buffer[ci][j][k];
-								buffer[ni][j][k] = r;
-								break;
-							case 1:
-								w = buffer[ni][j][k];
-								buffer[ni][j][k] = r;
-								break;
-							case -1:
-								w = r;
-								break;
-						}
+						w = buffer[ci][j][k];
+						buffer[ni][j][k] = r;
 						break;
 					case 1:
+						w = buffer[ni][j][k];
+						buffer[ni][j][k] = r;
+						break;
+					case -1:
+						w = r;
+						break;
+					case 2:
 						buffer[ni][j][k] = r;
 						if(j == 0) {
 							w = 0;
 						} else
 							w = buffer[ci][j - 1][k];
 						break;
-					case -1:
+					case -2:
 						buffer[ni][j][k] = r;
 						if(j == D - 1) {
 							w = 0;
 						} else
 							w = buffer[ci][j + 1][k];
+						break;
+					default:
 						break;
 				}
 				if(i % S == 0 && j % S ==0)
@@ -89,6 +86,7 @@ void _conv2d_1x1(hls::stream<T> &fmap, hls::stream<T> &out, const T p[C][N]){
 
 	T sum[N];
 #pragma HLS ARRAY_PARTITION variable=sum complete dim=1
+#pragma HLS ARRAY_PARTITION variable=p complete dim=2
 
 	for(int i=0;i<N;i++)
 #pragma HLS PIPELINE
@@ -181,27 +179,62 @@ void _duplicate(hls::stream<T> & in, hls::stream<T>& out1, hls::stream<T> &out2)
 		}
 }
 
-template<typename T, int D, int D_shift, int S_conv, int S_pool, int IP, int MP, int OP>
+template<typename T, int D, int D_shift, int S_conv, int IP, int E, int OP>
 void _shift(hls::stream<T> & input,
 		hls::stream<T> & output,
+		const int Dx[IP * E],
+		const T p0[IP][IP * E],
+		const T p1[IP * E][OP]
+		){
+	static const int MP = IP * E;
+	static const int sD = (D - 1)/D_shift + 1;
+	static const int cD = (sD - 1)/S_conv + 1;
+
+#pragma HLS INLINE
+		hls::stream<DataType> f_conv0, f_shift,f_conv1, f_relu;
+#pragma HLS STREAM variable=f_shift depth=1 dim=1
+#pragma HLS STREAM variable=f_conv0 depth=1 dim=1
+#pragma HLS STREAM variable=f_relu depth=1 dim=1
+#pragma HLS STREAM variable=f_conv1 depth=1 dim=1
+
+		_conv2d_1x1<DataType,D, IP, MP, 1>(input, f_conv0, p0);
+		_relu<DataType, D, MP>(f_conv0, f_relu);
+		_shift_3x3<DataType, D, MP, D_shift>(f_relu, f_shift, Dx);
+		_conv2d_1x1<DataType,sD, MP, OP, S_conv>(f_shift, f_conv1, p1);
+		_relu<DataType, cD, OP>(f_conv1, output);
+}
+
+template<typename T, int D, int D_shift, int S_conv, int IP, int MP, int OP>
+void _shift_pool(hls::stream<T> & input,
+		hls::stream<T> & output,
 		const int Dx[MP],
-		const int Dy[MP],
 		const T p0[IP][MP],
 		const T p1[MP][OP]
 		){
 	static const int sD = (D - 1)/D_shift + 1;
 	static const int cD = (sD - 1)/S_conv + 1;
-	static const int mD = (cD - 1)/S_pool + 1;
+
 #pragma HLS INLINE
-		hls::stream<DataType> f_conv0, f_shift,f_conv1, f_pool;
+		hls::stream<DataType> f_in1, f_in2, f_conv0, f_shift,f_conv1, f_pool, f_relu;
+#pragma HLS STREAM variable=f_in1 depth=1 dim=1
+#pragma HLS STREAM variable=f_in2 depth=1 dim=1
 #pragma HLS STREAM variable=f_shift depth=1 dim=1
 #pragma HLS STREAM variable=f_conv0 depth=1 dim=1
-#pragma HLS STREAM variable=f_pool depth=1 dim=1
 #pragma HLS STREAM variable=f_conv1 depth=1 dim=1
+#pragma HLS STREAM variable=f_pool depth=1 dim=1
+#pragma HLS STREAM variable=f_relu depth=1 dim=1
 
-		_conv2d_1x1<DataType,D, IP, MP, 1>(input, f_conv0, p0);
-		_shift_3x3<DataType, D, MP, D_shift>(f_conv0, f_shift, Dx, Dy);
+		_duplicate<T, D, IP>(input, f_in1, f_in2);
+		_conv2d_1x1<DataType,D, IP, MP, 1>(f_in1, f_conv0, p0);
+		_relu<DataType, D, OP>(f_conv0, f_relu);
+		_shift_3x3<DataType, D, MP, D_shift>(f_relu, f_shift, Dx);
 		_conv2d_1x1<DataType,sD, MP, OP, S_conv>(f_shift, f_conv1, p1);
-		_max_pool<DataType, cD, OP, S_pool>(f_conv1,f_pool);
-		_relu<DataType, mD, OP>(f_pool, output);
+		_max_pool<DataType, D, OP, D_shift * S_conv>(f_in2,f_pool);
+		_concat<T, cD, OP, IP>(f_conv1, f_pool, output);
+
+}
+
+
+template<typename T, int reduction>
+void _resnet(){
 }
