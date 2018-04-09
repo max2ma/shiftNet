@@ -5,9 +5,8 @@
 using namespace std;
 using namespace para;
 
-
 extern
-void shift(hls::stream<DataType>& tensor, hls::stream<DataType>& act);
+void shift(hls::stream<DataType> *tensor, hls::stream<DataType>* act);
 
 int main(){
 	DataType input[D][D][C] = {
@@ -19,11 +18,11 @@ int main(){
 	};
 
 
-hls::stream<DataType> istream, ostream;
+hls::stream<DataType> istream[C], ostream[N];
 for(int i=0;i<D;i++)
 		for(int j=0;j<D;j++)
 			for(int k=0;k<C;k++)
-				istream.write(input[i][j][k]);
+				istream[k].write(input[i][j][k]);
 
 
 	shift(istream, ostream);
@@ -34,7 +33,7 @@ for(int i=0;i<D;i++)
 	for(int i=0;i<nD;i++)
 		for(int j=0;j<nD;j++)
 			for(int k=0;k<N;k++){
-				DataType output = ostream.read();
+				DataType output = ostream[k].read();
 #ifdef FIXED
 				float diff = abs(( output - (DataType)ref[i][j][k]).to_float());
 				ave+=diff;

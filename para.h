@@ -14,6 +14,7 @@ namespace para{
 	const int D = 11;
 	const int C = 3;
 	const int E = 2;
+	const int M = E*C;
 	const int N = 16;
 	const int sS = 1;
 	const int cS = 2;

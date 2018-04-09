@@ -70,11 +70,10 @@ def main():
 	def block(idx ,fmap, in_c, out_c, ex,  stride):
 		p0 = np.random.rand(1, 1, in_c, in_c * ex)
 		np.savetxt("p0_%d"%idx, p0.reshape([1, -1]), delimiter=',')
-		t_conv0 = tf.nn.relu(tf.nn.conv2d(fmap,p0,strides=[1,1,1,1],
-					padding="VALID"))
-		d, k_shift = choice(in_c * ex)
-		np.savetxt("d_%d"%idx, d.reshape([1, -1]), delimiter=',', fmt='%d')
-		t_shift = tf.nn.conv2d(t_conv0, k_shift, strides=[1,1,1,1], padding="SAME")
+		t_conv0 = tf.nn.conv2d(fmap,p0,strides=[1,1,1,1],
+					padding="VALID")
+		t_relu=tf.nn.relu(t_conv0)
+		t_shift=shift(idx, t_relu, in_c*ex)
 		p1 = np.random.rand(1, 1, in_c * ex, out_c)
 		np.savetxt("p1_%d"%idx, p1.reshape([1, -1]), delimiter=',')
 		t_act = tf.nn.relu(tf.nn.conv2d(t_shift,p1,strides=[1,stride, stride,1],
@@ -82,10 +81,17 @@ def main():
 		return t_act
 
 
+	def shift(idx, t_im, in_c):
+
+		d, k_shift = choice(in_c)
+		np.savetxt("d_%d"%idx, d.reshape([1, -1]), delimiter=',', fmt='%d')
+		t_shift = tf.nn.conv2d(t_im, k_shift, strides=[1,1,1,1], padding="SAME")
+		return t_shift
 	g =tf.Graph()
 	with g.as_default():
 		t_im = tf.constant(tensor, dtype=tf.float32, shape=[1,D,D,C])
 		t_act = block(0, t_im, C, N, 2, 2)
+		#t_act=shift(0,t_im, C)
 	with tf.Session(graph=g) as sess:
 		t_gen= sess.run(t_act)
 		np.savetxt("t_act", t_gen.reshape([1, -1]), delimiter=',')
