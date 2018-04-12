@@ -55,8 +55,8 @@ namespace SingleChan{
 					buffer[0][i][j] = r;
 					buffer[1][i][j] = 0;
 				}
-			for(int i=0;i<D;i++){
-				for(int j=0;j<D;j++){
+			for(int i=0;i<D;i++)
+				for(int j=0;j<D;j++)
 					for(int k=0;k<C;k++){
 #pragma HLS PIPELINE
 						T r,w;
@@ -100,8 +100,6 @@ namespace SingleChan{
 						if(i % S == 0 && j % S ==0)
 							act.write(w);
 					}
-				}
-			}
 		}
 
 	template<typename T, int D, int C, int N, int S>
@@ -110,7 +108,8 @@ namespace SingleChan{
 
 			T sum[N];
 #pragma HLS ARRAY_PARTITION variable=sum complete dim=1
-
+			T tmp[N];
+#pragma HLS ARRAY_PARTITION variable=tmp complete dim=1
 			for(int i=0;i<N;i++)
 #pragma HLS PIPELINE
 				sum[i] = 0;
@@ -118,18 +117,17 @@ namespace SingleChan{
 			int is =0, js =0;
 			for(int i=0, is =0;i<D;i++, is++){
 				for(int j=0, js=0;j<D;j++, js++){
+
+#pragma HLS PIPELINE II=C
 					if(is == S) is =0;
 					if(js == S) js =0;
 
 					for(int k=0;k<C;k++){
-#pragma HLS PIPELINE
-						T tmp = fmap.read();
+						tmp[k] = fmap.read();
 						for(int n=0;n<N;n++)
-#pragma HLS UNROLL
-							sum[n] += p[k][n] * tmp;
+							sum[n] += p[k][n] * tmp[k];
 					}
 					for(int n=0;n<N;n++){
-#pragma HLS PIPELINE
 						if(is ==0 && js ==0)
 							out.write(sum[n]);
 						sum[n] = 0;
@@ -252,14 +250,14 @@ namespace SingleChan{
 
 namespace MulChan{
 
-	template<typename T, int D, int C, int S>
+	template<typename T, int D, int C, int S, int IIs = 1>
 		void _shift_3x3(hls::stream<T> fmap[C], hls::stream<T> out[C], const int Dx[C]){
 			static const int nD = (D - 1)/S + 1;
 #pragma HLS ARRAY_PARTITION variable=Dx complete dim=1
 #pragma HLS ARRAY_PARTITION variable=fmap complete dim=1
 #pragma HLS ARRAY_PARTITION variable=out complete dim=1
 			T buffer[2][D][C];
-#pragma HLS ARRAY_PARTITION variable=buffer complete dim=3
+//#pragma HLS ARRAY_PARTITION variable=buffer block factor=C dim=3
 			for(int i=0;i<D;i++)
 #pragma HLS PIPELINE
 				for(int j=0;j<C;j++){
@@ -269,7 +267,7 @@ namespace MulChan{
 				}
 			for(int i=0;i<D;i++){
 				for(int j=0;j<D;j++){
-#pragma HLS PIPELINE
+#pragma HLS PIPELINE II = IIs
 					for(int k=0;k<C;k++){
 						T r,w;
 						if(i != D -1)
@@ -315,7 +313,7 @@ namespace MulChan{
 				}
 			}
 		}
-	template<typename T, int D, int C, int S>
+	template<typename T, int D, int C, int S, int IIs=1>
 		void _max_pool(hls::stream<T> fmap[C], hls::stream<T> out[C]){
 #pragma HLS ARRAY_PARTITION variable=out complete dim=1
 #pragma HLS ARRAY_PARTITION variable=fmap complete dim=1
@@ -324,8 +322,8 @@ namespace MulChan{
 #pragma HLS ARRAY_PARTITION variable=buffer complete dim=2
 			int c =0, is =0, js =0;
 			for(int i = 0;i<D;i++, is++)
-#pragma HLS PIPELINE
 				for(int j = 0, js = 0, c = 0;j<D;j++, js++)
+#pragma HLS PIPELINE II=IIs
 					for(int k = 0;k<C;k++){
 						if(is == S) is = 0;
 						if(js == S) {
@@ -346,13 +344,13 @@ namespace MulChan{
 							out[k].write(cmp);
 					}
 		}
-	template<typename T, int D, int C>
+	template<typename T, int D, int C, int IIs=1>
 		void _relu(hls::stream<T> fmap[C], hls::stream<T> out[C]){
 #pragma HLS ARRAY_PARTITION variable=fmap complete dim=1
 #pragma HLS ARRAY_PARTITION variable=out complete dim=1
 			for(int i=0;i<D;i++){
 				for(int j=0;j<D;j++){
-#pragma HLS PIPELINE
+#pragma HLS PIPELINE II=IIs
 					for(int k=0;k<C;k++){
 						T diff = fmap[k].read();
 						if(diff < 0)
@@ -364,10 +362,10 @@ namespace MulChan{
 			}
 		}
 
-	template<typename T, int D, int C, int N, int S>
+	template<typename T, int D, int C, int N, int S, int IIs=1>
 		void _conv2d_1x1(hls::stream<T> fmap[C], hls::stream<T> out[N], const T p[C][N]){
 
-#pragma HLS ARRAY_PARTITION variable=p complete dim=0
+//#pragma HLS ARRAY_PARTITION variable=p dim=0
 #pragma HLS ARRAY_PARTITION variable=fmap complete dim=1
 #pragma HLS ARRAY_PARTITION variable=out complete dim=1
 			T sum[N], tmp[C];
@@ -381,15 +379,15 @@ namespace MulChan{
 			int is =0, js =0;
 			for(int i=0, is =0;i<D;i++, is++){
 				for(int j=0, js=0;j<D;j++, js++){
-#pragma HLS PIPELINE
+#pragma HLS PIPELINE II=IIs
 					if(is == S) is =0;
 					if(js == S) js =0;
 
-					for(int k=0;k<C;k++)
-						tmp[k] = fmap[k].read();
-					for(int k=0;k<C;k++)
+					for(int c=0;c<C;c++)
+						tmp[c] = fmap[c].read();
+					for(int c=0;c<C;c++)
 						for(int n=0;n<N;n++)
-							sum[n] += p[k][n] * tmp[k];
+							sum[n] += p[c][n] * tmp[c];
 
 					for(int n=0;n<N;n++){
 						if(is ==0 && js ==0)
@@ -399,7 +397,7 @@ namespace MulChan{
 				}
 			}
 		}
-	template<typename T, int D, int C, int N>
+	template<typename T, int D, int C, int N, int IIs=1>
 	void _matMul(hls::stream<T> fmap[C], hls::stream<T> out[N], const T p[D*D*C][N]){
 #pragma HLS ARRAY_PARTITION variable=p complete dim=2
 		T sum[N], r[C];
@@ -410,7 +408,7 @@ namespace MulChan{
 			sum[n] = 0;
 		for(int i=0;i<D;i++){
 			for(int j=0;j<D;j++){
-#pragma HLS PIPELINE
+#pragma HLS PIPELINE II=IIs
 				for(int k=0;k<C;k++){
 					r[k] = fmap[k].read();
 					for(int n=0;n<N;n++)
@@ -423,7 +421,7 @@ namespace MulChan{
 			out[n].write(sum[n]);
 	}
 
-	template<typename T, int D, int D_shift, int S_conv, int IP, int E, int OP>
+	template<typename T, int D, int D_shift, int S_conv, int IP, int E, int OP, int IIs=1>
 		void _shift(hls::stream<T> input[IP],
 				hls::stream<T> output[OP],
 				const int Dx[IP * E],
@@ -437,11 +435,11 @@ namespace MulChan{
 #pragma HLS INLINE
 			hls::stream<DataType> f_conv0[MP], f_shift[MP],f_conv1[OP], f_relu[MP];
 
-			_conv2d_1x1<DataType,D, IP, MP, 1>(input, f_conv0, p0);
-			_relu<DataType, D, MP>(f_conv0, f_relu);
-			_shift_3x3<DataType, D, MP, D_shift>(f_relu, f_shift, Dx);
-			_conv2d_1x1<DataType,sD, MP, OP, S_conv>(f_shift, f_conv1, p1);
-			_relu<DataType, cD, OP>(f_conv1, output);
+			_conv2d_1x1<DataType,D, IP, MP, 1, IIs>(input, f_conv0, p0);
+			_relu<DataType, D, MP, IIs>(f_conv0, f_relu);
+			_shift_3x3<DataType, D, MP, D_shift, IIs>(f_relu, f_shift, Dx);
+			_conv2d_1x1<DataType,sD, MP, OP, S_conv, IIs>(f_shift, f_conv1, p1);
+			_relu<DataType, cD, OP, IIs>(f_conv1, output);
 		}
 }
 
