@@ -5,10 +5,13 @@
 using namespace std;
 using namespace para;
 
+#ifdef MUL_NET
 extern
 void shift(hls::stream<DataType> *tensor, hls::stream<DataType>* act);
+#elif defined SING_NET
 extern
 void shift(hls::stream<DataType> &tensor, hls::stream<DataType> & act);
+#endif
 
 int main(){
 	DataType input[D][D][C] = {
