@@ -2,6 +2,7 @@
 #include "hls_stream.h"
 #include "para.h"
 #include "shift.h"
+#include "conv2d.h"
 using namespace para;
 
 
@@ -12,18 +13,57 @@ void shift(hls::stream<DataType> & tensor,
 #pragma HLS INTERFACE axis register both port=tensor
 #pragma HLS INTERFACE axis register both port=act
 
-		const int D0[C * E]={
-#include "d_0"
-		};
-		const DataType p0[C][C * E]={
-#include "p0_0"
-		};
-		const DataType p1[C * E][N]={
-#include "p1_0"
-		};
 
 #pragma HLS DATAFLOW
-		SingleChan::_shift<DataType, D, sS, cS, C, E, N>(tensor, act, D0 ,p0,p1);
+		static const int CHAN_0 = 16;
+		static const int CHAN_1 = 32;
+		static const int CHAN_2 = 64;
+
+		static const int DIM_0 = 32;
+		static const int DIM_1 = 16;
+		static const int DIM_2 = 8;
+
+
+#pragma HLS DATAFLOW
+
+		// GROUP 1
+		hls::stream<DataType> s_act0,s_act1,s_act2;
+		// BLOCK 0
+		const int D0[C]={
+#include "d_0"
+		};
+		const DataType p0_0[C][C]={
+#include "p0_0"
+		};
+		const DataType p1_0[C][CHAN_0]={
+#include "p1_0"
+		};
+		SingleChan::_shift<DataType, DIM_0, 1, 1, C, 1, CHAN_0>(tensor, s_act0, D0 ,p0_0,p1_0);
+
+		//BLOCK 1
+		const int D1[CHAN_0]={
+#include "d_1"
+		};
+		const DataType p0_1[CHAN_0][CHAN_0]={
+#include "p0_1"
+		};
+		const DataType p1_1[CHAN_0][CHAN_0]={
+#include "p1_1"
+		};
+		SingleChan::_shift<DataType, DIM_0, 1, 1, CHAN_0, 1, CHAN_0>(s_act0, s_act1, D1 ,p0_1,p1_1);
+
+		//BLOCK 2
+		const int D2[CHAN_0]={
+#include "d_2"
+		};
+		const DataType p0_2[CHAN_0][CHAN_0]={
+#include "p0_2"
+		};
+		const DataType p1_2[CHAN_0][CHAN_0]={
+#include "p1_2"
+		};
+		SingleChan::_shift<DataType, DIM_0, 1, 1, CHAN_0, 1, CHAN_0>(s_act1, act, D2 ,p0_2,p1_2);
+
 }
 #elif defined MUL
 void shift(hls::stream<DataType> tensor[C],
@@ -234,6 +274,8 @@ void shift(hls::stream<DataType>  tensor[C], hls::stream<DataType> act[N]){
 
 
 
+		static const int EXP = 1;
+
 		static const int CHAN_0 = 16;
 		static const int CHAN_1 = 32;
 		static const int CHAN_2 = 64;
@@ -245,29 +287,34 @@ void shift(hls::stream<DataType>  tensor[C], hls::stream<DataType> act[N]){
 
 
 #pragma HLS DATAFLOW
+		const DataType kernel[3][3][C][CHAN_0] = {
+#include "t_k"
+		};
+		hls::stream<DataType> s_conv[CHAN_0];
+		conv2d_3x3<DataType, D, C, CHAN_0, 1, REX>(tensor, kernel, s_conv);
 
 		// GROUP 1
 		hls::stream<DataType> s_act0[CHAN_0],s_act1[CHAN_0],s_act2[CHAN_0];
 		// BLOCK 0
-		const int D0[C]={
+		const int D0[CHAN_0]={
 #include "d_0"
 		};
-		const DataType p0_0[C][C]={
+		const DataType p0_0[CHAN_0][CHAN_0 * EXP]={
 #include "p0_0"
 		};
-		const DataType p1_0[C][CHAN_0]={
+		const DataType p1_0[CHAN_0 * EXP][CHAN_0]={
 #include "p1_0"
 		};
-		MulChan::_shift<DataType, DIM_0, 1, 1, C, 1, CHAN_0, 1 * REX>(tensor, s_act0, D0 ,p0_0,p1_0);
+		MulChan::_shift<DataType, DIM_0, 1, 1, CHAN_0, 1, CHAN_0, 1 * REX>(s_conv, s_act0, D0 ,p0_0,p1_0);
 
 		//BLOCK 1
 		const int D1[CHAN_0]={
 #include "d_1"
 		};
-		const DataType p0_1[CHAN_0][CHAN_0]={
+		const DataType p0_1[CHAN_0][CHAN_0 * EXP]={
 #include "p0_1"
 		};
-		const DataType p1_1[CHAN_0][CHAN_0]={
+		const DataType p1_1[CHAN_0 * EXP][CHAN_0]={
 #include "p1_1"
 		};
 		MulChan::_shift<DataType, DIM_0, 1, 1, CHAN_0, 1, CHAN_0, 1 * REX>(s_act0, s_act1, D1 ,p0_1,p1_1);
@@ -361,7 +408,7 @@ void shift(hls::stream<DataType>  tensor[C], hls::stream<DataType> act[N]){
 		};
 		hls::stream<DataType> s_fc[N];
 		MulChan::_matMul<DataType, DIM_2, CHAN_2, N, 16 * REX>(s_act8, s_fc, p_9);
-		MulChan::_relu<DataType, 1, N>(s_fc, act);
+		MulChan::_relu<DataType, 1, N, 1>(s_fc, act);
 }
 
 #endif
