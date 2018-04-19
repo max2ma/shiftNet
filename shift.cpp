@@ -290,8 +290,9 @@ void shift(hls::stream<DataType>  tensor[C], hls::stream<DataType> act[N]){
 		const DataType kernel[3][3][C][CHAN_0] = {
 #include "t_k"
 		};
-		hls::stream<DataType> s_conv[CHAN_0];
-		conv2d_3x3<DataType, D, C, CHAN_0, 1, REX>(tensor, kernel, s_conv);
+		hls::stream<DataType> s_conv[CHAN_0], s_pad[C];
+		padding<DataType,D, C, 1, REX>(tensor, s_pad);
+		conv2d_3x3<DataType, D + 2, C, CHAN_0, 1, REX>(s_pad, kernel, s_conv);
 
 		// GROUP 1
 		hls::stream<DataType> s_act0[CHAN_0],s_act1[CHAN_0],s_act2[CHAN_0];
