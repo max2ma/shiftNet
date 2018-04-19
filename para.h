@@ -3,7 +3,7 @@
 #include "hls_half.h"
 
 //#define MUL
-#define SINGLE_NET
+#define MUL_NET
 //#define FIXED
 
 #ifdef FIXED
