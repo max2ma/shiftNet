@@ -5,6 +5,7 @@
 
 template<typename T, int D, int C, int P, int IIs>
 void padding(hls::stream<T> fmap[C], hls::stream<T> omap[C]){
+#pragma HLS INLINE
 	
 	for(int i=0;i<D + 2*P;i++)
 		for(int j=0;j<D + 2*P;j++){
@@ -36,18 +37,18 @@ void conv2d_3x3(hls::stream<T> fmap[C], const T kernel[3][3][C][K], hls::stream<
 #pragma HLS ARRAY_PARTITION variable=crop complete dim=0
 	T sum[K];
 #pragma HLS ARRAY_PARTITION variable=sum complete dim=0
-
+/*
 	for(int i=0;i<2;i++)
 		for(int j=0;j<D;j++)
 #pragma HLS PIPELINE
 			for(int c=0;c<C;c++)
 				buffer[i][j][c] = fmap[c].read();
-
-	for(int i=0;i<D - 2;i++){
+*/
+	for(int i=0;i<D;i++){
 		for(int j=0;j<D;j++){
-//#pragma HLS PIPELINE II=IIs
+#pragma HLS PIPELINE II=IIs
 			int ci = (i & 0x01);
-			bool b_out = (i % S == 0) && ((j - 2) % S == 0);
+			bool b_out = ((i-2) % S == 0) && ((j - 2) % S == 0);
 			for(int c = 0;c<C;c++){
 #pragma HLS PIPELINE
 				// crop shift left
@@ -72,7 +73,7 @@ void conv2d_3x3(hls::stream<T> fmap[C], const T kernel[3][3][C][K], hls::stream<
 					for(int fi = 0; fi<3;fi++)
 						for(int fj = 0; fj<3;fj++)
 							sum[k] += crop[fi][fj][c] * kernel[fi][fj][c][k];
-				if(j>=2 && b_out)
+				if(j>=2 && i>=2 && b_out)
 					omap[k].write(sum[k]);
 			}
 		}
@@ -86,24 +87,24 @@ void conv2d(hls::stream<T> fmap[C], const T kernel[F][F][C][K], hls::stream<T> o
 
 	static const int nD = (D - F)/S + 1;
 	T buffer[F-1][D][C];
-//#pragma HLS ARRAY_PARTITION variable=buffer complete dim=3
+#pragma HLS ARRAY_PARTITION variable=buffer complete dim=3
 #pragma HLS ARRAY_PARTITION variable=buffer complete dim=1
 	T crop[F][F][C];
 #pragma HLS ARRAY_PARTITION variable=crop complete dim=0
 	T sum[K];
 //#pragma HLS ARRAY_PARTITION variable=sum complete dim=0
-
+/*
 	for(int i=0;i<F-1;i++)
 		for(int j=0;j<D;j++)
 			for(int c=0;c<C;c++)
 #pragma HLS PIPELINE
 				buffer[i][j][c] = fmap[c].read();
-
-	for(int i=0, ci = 0;i<D - F + 1;ci++, i++){
+*/
+	for(int i=0, ci = 0;i<D;ci++, i++){
 		for(int j=0;j<D;j++){
 #pragma HLS PIPELINE II=IIs
 			if(ci == F - 1) ci = 0;
-			bool b_out = (i % S == 0) && (j >= F - 1) && ((j - F + 1) % S == 0);
+			bool b_out = (i >=F-1) && ((i-F+1) % S == 0) && (j >= F - 1) && ((j - F + 1) % S == 0);
 			for(int c = 0;c<C;c++){
 #pragma HLS PIPELINE
 				// crop shift left
