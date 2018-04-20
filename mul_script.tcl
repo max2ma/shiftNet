@@ -5,8 +5,8 @@
 ############################################################
 open_project -reset shiftnet
 set_top shift
-add_files shift.cpp
-add_files -tb main.cpp
+add_files shift.cpp -cflags "-I./params"
+add_files -tb main.cpp -cflags "-I./params"
 open_solution -reset "conv_net"
 set_part {xcvu9p-flgb2104-2-i}
 create_clock -period 5 -name default
