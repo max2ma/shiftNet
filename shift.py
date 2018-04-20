@@ -51,6 +51,9 @@ def main():
 	C = 3
 	tensor = np.random.normal(size=(D, D, C))
 	np.savetxt("input", tensor.reshape([1, -1]), delimiter=',')
+	
+	kernel = np.random.normal(size=(3, 3, C, 16))
+	np.savetxt("t_k", kernel.reshape([1, -1]), delimiter=',')
 
 	fc = np.random.normal(size=(8, 8, 64, 10))
 	np.savetxt("p_9", fc.reshape([1, -1]), delimiter=',')
@@ -79,7 +82,8 @@ def main():
 	with g.as_default():
 		t_im = tf.constant(tensor, dtype=tf.float32, shape=[1,D,D,C])
 		p_9 = tf.constant(np.reshape(fc, [-1, 10]), dtype=tf.float32)
-		t_act0 = block(0, t_im, C, 16, 1, 1)
+		t_conv = tf.nn.conv2d(t_im, kernel, strides=[1,1,1,1], padding="SAME")
+		t_act0 = block(0, t_conv, 16, 16, 1, 1)
 		t_act1 = block(1, t_act0, 16, 16, 1, 1)
 		t_act2 = block(2, t_act1, 16, 16, 1, 1)
 		t_act3 = block(3, t_act2, 16, 32, 1, 2)
