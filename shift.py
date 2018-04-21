@@ -50,23 +50,23 @@ def main():
 	D = 32
 	C = 3
 	tensor = np.random.normal(size=(D, D, C))
-	np.savetxt("input", tensor.reshape([1, -1]), delimiter=',')
+	np.savetxt(r"params/input", tensor.reshape([1, -1]), delimiter=',')
 	
 	kernel = np.random.normal(size=(3, 3, C, 16))
-	np.savetxt("t_k", kernel.reshape([1, -1]), delimiter=',')
+	np.savetxt(r"params/t_k", kernel.reshape([1, -1]), delimiter=',')
 
 	fc = np.random.normal(size=(8, 8, 64, 10))
-	np.savetxt("p_9", fc.reshape([1, -1]), delimiter=',')
+	np.savetxt(r"params/p_9", fc.reshape([1, -1]), delimiter=',')
 	
 	def block(idx ,fmap, in_c, out_c, ex,  stride):
 		p0 = np.random.normal(scale=1/np.sqrt(in_c),size=(1, 1, in_c, in_c * ex))
-		np.savetxt("p0_%d"%idx, p0.reshape([1, -1]), delimiter=',')
+		np.savetxt(r"params/p0_%d"%idx, p0.reshape([1, -1]), delimiter=',')
 		t_conv0 = tf.nn.conv2d(fmap,p0,strides=[1,1,1,1],
 					padding="VALID")
 		t_relu=tf.nn.relu(t_conv0)
 		t_shift=shift(idx, t_relu, in_c*ex)
 		p1 = np.random.normal(scale=1/np.sqrt(out_c),size=(1, 1, in_c * ex, out_c))
-		np.savetxt("p1_%d"%idx, p1.reshape([1, -1]), delimiter=',')
+		np.savetxt(r"params/p1_%d"%idx, p1.reshape([1, -1]), delimiter=',')
 		t_act = tf.nn.relu(tf.nn.conv2d(t_shift,p1,strides=[1,stride, stride,1],
 					padding="VALID"), name="block_%d"%idx)
 		return t_act
@@ -75,7 +75,7 @@ def main():
 	def shift(idx, t_im, in_c):
 
 		d, k_shift = choice(in_c)
-		np.savetxt("d_%d"%idx, d.reshape([1, -1]), delimiter=',', fmt='%d')
+		np.savetxt(r"params/d_%d"%idx, d.reshape([1, -1]), delimiter=',', fmt='%d')
 		t_shift = tf.nn.conv2d(t_im, k_shift, strides=[1,1,1,1], padding="SAME")
 		return t_shift
 	g =tf.Graph()
