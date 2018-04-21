@@ -14,8 +14,8 @@ int main(){
 #include "input"
 	};
 
-	float ref[nD][nD][N] = {
-#include "t_act"
+	float ref[N] = {
+#include "t_cifar"
 	};
 
 
@@ -31,24 +31,20 @@ for(int i=0;i<D;i++)
 
 	int err = 0;
 	float ave = 0;
-	for(int i=0;i<nD;i++)
-		for(int j=0;j<nD;j++)
-			for(int k=0;k<N;k++){
+	for(int k=0;k<N;k++){
 				DataType output = ostream.read();
 #ifdef FIXED
-				float diff = abs(( output - (DataType)ref[i][j][k]).to_float());
+				float diff = abs(( output - (DataType)ref[k]).to_float());
 				ave+=diff;
 #else
-				float diff = abs(output - ref[i][j][k]);
+				float diff = abs(output - ref[k]);
 				ave+=diff;
 #endif
 				if (diff > 1e-2){
 					err ++;
-					cout <<i<<','
-							<<j<<','
-							<<k<<','
+					cout<<k<<','
 							<<output<<','
-							<<ref[i][j][k]<<endl;
+							<<ref[k]<<endl;
 
 				}
 			}
