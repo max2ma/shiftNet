@@ -13,7 +13,7 @@ typedef half DataType;
 #endif
 namespace para{
 	const int D = 32;
-#if defined SINGLE_NET || defined MUL_NET
+#ifdef MUL_NET
 	const int C = 3;
 	const int N = 10;
 #else
