@@ -167,6 +167,15 @@ namespace SingleChan{
 					}
 		}
 
+	template<typename T, int D, int C>
+		void _add(hls::stream<T> & in1, hls::stream<T>& in2, hls::stream<T> &out){
+			for(int i=0;i<D;i++)
+				for(int j=0;j<D;j++){
+					for(int k = 0; k<C;k++)
+#pragma HLS PIPELINE
+						out.write(in1.read() + in2.read());
+				}
+		}
 	template<typename T, int D, int C1, int C2>
 		void _concat(hls::stream<T> & in1, hls::stream<T>& in2, hls::stream<T> &out){
 			for(int i=0;i<D;i++)
@@ -213,7 +222,7 @@ namespace SingleChan{
 		}
 
 	template<typename T, int D, int D_shift, int S_conv, int IP, int MP, int OP>
-		void _shift_pool(hls::stream<T> & input,
+		void _shift_concat(hls::stream<T> & input,
 				hls::stream<T> & output,
 				const int Dx[MP],
 				const T p0[IP][MP],
@@ -224,13 +233,6 @@ namespace SingleChan{
 
 #pragma HLS INLINE
 			hls::stream<DataType> f_in1, f_in2, f_conv0, f_shift,f_conv1, f_pool, f_relu;
-#pragma HLS STREAM variable=f_in1 depth=1 dim=1
-#pragma HLS STREAM variable=f_in2 depth=1 dim=1
-#pragma HLS STREAM variable=f_shift depth=1 dim=1
-#pragma HLS STREAM variable=f_conv0 depth=1 dim=1
-#pragma HLS STREAM variable=f_conv1 depth=1 dim=1
-#pragma HLS STREAM variable=f_pool depth=1 dim=1
-#pragma HLS STREAM variable=f_relu depth=1 dim=1
 
 			_duplicate<T, D, IP>(input, f_in1, f_in2);
 			_conv2d_1x1<DataType,D, IP, MP, 1>(f_in1, f_conv0, p0);
@@ -243,8 +245,28 @@ namespace SingleChan{
 		}
 
 }
+	template<typename T, int D, int D_shift, int S_conv, int IP, int MP, int OP>
+		void _shift_res(hls::stream<T> & input,
+				hls::stream<T> & output,
+				const int Dx[MP],
+				const T p0[IP][MP],
+				const T p1[MP][OP]
+				){
+			static const int sD = (D - 1)/D_shift + 1;
+			static const int cD = (sD - 1)/S_conv + 1;
 
+#pragma HLS INLINE
+			hls::stream<DataType> f_in1, f_in2, f_conv0, f_shift,f_conv1, f_pool, f_relu;
 
+			_duplicate<T, D, IP>(input, f_in1, f_in2);
+			_conv2d_1x1<DataType,D, IP, MP, 1>(f_in1, f_conv0, p0);
+			_relu<DataType, D, OP>(f_conv0, f_relu);
+			_shift_3x3<DataType, D, MP, D_shift>(f_relu, f_shift, Dx);
+			_conv2d_1x1<DataType,sD, MP, OP, S_conv>(f_shift, f_conv1, p1);
+			_conv2d_1x1<DataType, D, IP, OP, D_shift * S_conv>(f_in2,f_pool);
+			_add<T, cD, OP>(f_conv1, f_pool, output);
 
+		}
 
+}
 
