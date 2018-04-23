@@ -98,6 +98,38 @@ namespace MulChan{
 							out[k].write(cmp);
 					}
 		}
+	
+	template<typename T, int D, int C, int IIs>
+		void _add(hls::stream<T> fmap_0[C], hls::stream<T> fmap_1[C], hls::stream<T> out[C]){
+#pragma HLS ARRAY_PARTITION variable=fmap_0 complete dim=1
+#pragma HLS ARRAY_PARTITION variable=fmap_1 complete dim=1
+#pragma HLS ARRAY_PARTITION variable=out complete dim=1
+			for(int i=0;i<D;i++){
+				for(int j=0;j<D;j++){
+#pragma HLS PIPELINE II=IIs
+					for(int k=0;k<C;k++){
+						out[k].write(fmap_0[k].read() + fmap_1[k].read());
+					}
+				}
+			}
+		}
+	
+	template<typename T, int D, int C, int IIs>
+		void _duplicate(hls::stream<T> fmap[C], hls::stream<T> out_0[C], hls::stream<T> out_1[C]){
+#pragma HLS ARRAY_PARTITION variable=fmap complete dim=1
+#pragma HLS ARRAY_PARTITION variable=out_0 complete dim=1
+#pragma HLS ARRAY_PARTITION variable=out_1 complete dim=1
+			for(int i=0;i<D;i++){
+				for(int j=0;j<D;j++){
+#pragma HLS PIPELINE II=IIs
+					for(int k=0;k<C;k++){
+						T r = fmap[k].read();
+						out_0[k].write(r);
+						out_1[k].write(r);
+					}
+				}
+			}
+		}
 	template<typename T, int D, int C, int IIs>
 		void _relu(hls::stream<T> fmap[C], hls::stream<T> out[C]){
 #pragma HLS ARRAY_PARTITION variable=fmap complete dim=1
@@ -175,25 +207,50 @@ namespace MulChan{
 			out[n].write(sum[n]);
 	}
 
-	template<typename T, int D, int D_shift, int S_conv, int IP, int E, int OP, int IIs>
+	template<typename T, int D, int IP, int E, int IIs>
 		void _shift(hls::stream<T> input[IP],
-				hls::stream<T> output[OP],
+				hls::stream<T> output[IP],
 				const int Dx[IP * E],
 				const T p0[IP][IP * E],
-				const T p1[IP * E][OP]
+				const T p1[IP * E][IP]
 				){
 			static const int MP = IP * E;
-			static const int sD = (D - 1)/D_shift + 1;
-			static const int cD = (sD - 1)/S_conv + 1;
 
 #pragma HLS INLINE
-			hls::stream<DataType> f_conv0[MP], f_shift[MP],f_conv1[OP], f_relu[MP];
+			hls::stream<DataType> f_conv0[MP], f_shift[MP],f_conv1[IP], f_relu[MP];
 
 			_conv2d_1x1<DataType,D, IP, MP, 1, IIs>(input, f_conv0, p0);
 			_relu<DataType, D, MP, IIs>(f_conv0, f_relu);
-			_shift_3x3<DataType, D, MP, D_shift, IIs>(f_relu, f_shift, Dx);
-			_conv2d_1x1<DataType,sD, MP, OP, S_conv, IIs>(f_shift, f_conv1, p1);
-			_relu<DataType, cD, OP, IIs>(f_conv1, output);
+			_shift_3x3<DataType, D, MP, 1, IIs>(f_relu, f_shift, Dx);
+			_conv2d_1x1<DataType,D, MP, IP, 1, IIs>(f_shift, f_conv1, p1);
+			_relu<DataType, D, IP, IIs>(f_conv1, output);
+		}
+	template<typename T, int D, int S_conv, int IP, int E, int OP, int IIs>
+		void _shift_res(hls::stream<T> input[IP],
+				hls::stream<T> output[OP],
+				const int Dx[IP * E],
+				const T p0[IP][IP * E],
+				const T p1[IP * E][OP],
+				const T p2[IP][OP]
+				){
+			static const int MP = IP * E;
+			static const int nD = (D - 1)/S_conv + 1;
+
+#pragma HLS INLINE
+			hls::stream<DataType> f_in0[IP], f_in1[IP];
+			_duplicate<DataType, D, IP, IIs>(input, f_in0, f_in1);
+
+			hls::stream<DataType> f_conv0[MP], f_shift[MP], f_relu[MP];
+			hls::stream<DataType> f_conv1[OP],f_relu1[OP], f_shortcut[OP];
+
+			_conv2d_1x1<DataType,D, IP, MP, 1, IIs>(f_in0, f_conv0, p0);
+			_relu<DataType, D, MP, IIs>(f_conv0, f_relu);
+			_shift_3x3<DataType, D, MP, 1, IIs>(f_relu, f_shift, Dx);
+			_conv2d_1x1<DataType,D, MP, OP, S_conv, IIs>(f_shift, f_conv1, p1);
+			_relu<DataType, nD, OP, IIs>(f_conv1, f_relu1);
+
+			_conv2d_1x1<DataType, D, IP, OP, S_conv, IIs>(f_in1, f_shortcut, p2);
+			_add<DataType, nD, OP, IIs>(f_relu1, f_shortcut, output);
 		}
 }
 
