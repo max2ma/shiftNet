@@ -109,7 +109,7 @@ void shift(hls::stream<DataType>  tensor[C], hls::stream<DataType> act[N]){
 		const DataType p1_0[CHAN_0 * EXP][CHAN_0]={
 #include "p1_0"
 		};
-		MulChan::_shift<DataType, DIM_0, 1, 1, CHAN_0, 1, CHAN_0, 1 * REX>(s_conv, s_act0, D0 ,p0_0,p1_0);
+		MulChan::_shift<DataType, DIM_0, CHAN_0, 1, 1 * REX>(s_conv, s_act0, D0 ,p0_0,p1_0);
 
 		//BLOCK 1
 		const int D1[CHAN_0]={
@@ -121,7 +121,7 @@ void shift(hls::stream<DataType>  tensor[C], hls::stream<DataType> act[N]){
 		const DataType p1_1[CHAN_0 * EXP][CHAN_0]={
 #include "p1_1"
 		};
-		MulChan::_shift<DataType, DIM_0, 1, 1, CHAN_0, 1, CHAN_0, 1 * REX>(s_act0, s_act1, D1 ,p0_1,p1_1);
+		MulChan::_shift<DataType, DIM_0, CHAN_0, 1, 1 * REX>(s_act0, s_act1, D1 ,p0_1,p1_1);
 
 		//BLOCK 2
 		const int D2[CHAN_0]={
@@ -133,7 +133,7 @@ void shift(hls::stream<DataType>  tensor[C], hls::stream<DataType> act[N]){
 		const DataType p1_2[CHAN_0][CHAN_0]={
 #include "p1_2"
 		};
-		MulChan::_shift<DataType, DIM_0, 1, 1, CHAN_0, 1, CHAN_0, 1 * REX>(s_act1, s_act2, D2 ,p0_2,p1_2);
+		MulChan::_shift<DataType, DIM_0, CHAN_0, 1, 1 * REX>(s_act1, s_act2, D2 ,p0_2,p1_2);
 
 		// GROUP 2
 		hls::stream<DataType> s_act3[CHAN_1],s_act4[CHAN_1],s_act5[CHAN_1];
@@ -147,7 +147,10 @@ void shift(hls::stream<DataType>  tensor[C], hls::stream<DataType> act[N]){
 		const DataType p1_3[CHAN_0][CHAN_1]={
 #include "p1_3"
 		};
-		MulChan::_shift<DataType, DIM_0, 1, 2, CHAN_0, 1, CHAN_1, 1 * REX>(s_act2, s_act3, D3 ,p0_3,p1_3);
+		const DataType p2_3[CHAN_0][CHAN_1]={
+#include "p2_3"
+		};
+		MulChan::_shift_res<DataType, DIM_0, 2, CHAN_0, 1, CHAN_1, 1 * REX>(s_act2, s_act3, D3 ,p0_3,p1_3, p2_3);
 		//BLOCK 4
 		const int D4[CHAN_1]={
 #include "d_4"
@@ -158,7 +161,7 @@ void shift(hls::stream<DataType>  tensor[C], hls::stream<DataType> act[N]){
 		const DataType p1_4[CHAN_1][CHAN_1]={
 #include "p1_4"
 		};
-		MulChan::_shift<DataType, DIM_1, 1, 1, CHAN_1, 1, CHAN_1, 4 * REX>(s_act3, s_act4, D4 ,p0_4,p1_4);
+		MulChan::_shift<DataType, DIM_1, CHAN_1, 1, 4 * REX>(s_act3, s_act4, D4 ,p0_4,p1_4);
 		//BLOCK 5
 		const int D5[CHAN_1]={
 #include "d_5"
@@ -169,7 +172,7 @@ void shift(hls::stream<DataType>  tensor[C], hls::stream<DataType> act[N]){
 		const DataType p1_5[CHAN_1][CHAN_1]={
 #include "p1_5"
 		};
-		MulChan::_shift<DataType, DIM_1, 1, 1, CHAN_1, 1, CHAN_1, 4 * REX>(s_act4, s_act5, D5 ,p0_5,p1_5);
+		MulChan::_shift<DataType, DIM_1, CHAN_1,1, 4 * REX>(s_act4, s_act5, D5 ,p0_5,p1_5);
 		//GROUP 3
 		hls::stream<DataType> s_act6[CHAN_2],s_act7[CHAN_2],s_act8[CHAN_2];
 		//BLOCK 6
@@ -182,7 +185,10 @@ void shift(hls::stream<DataType>  tensor[C], hls::stream<DataType> act[N]){
 		const DataType p1_6[CHAN_1][CHAN_2]={
 #include "p1_6"
 		};
-		MulChan::_shift<DataType, DIM_1, 1, 2, CHAN_1, 1, CHAN_2, 4 * REX>(s_act5, s_act6, D6 ,p0_6,p1_6);
+		const DataType p2_6[CHAN_1][CHAN_2]={
+#include "p2_6"
+		};
+		MulChan::_shift_res<DataType, DIM_1, 2, CHAN_1, 1, CHAN_2, 4 * REX>(s_act5, s_act6, D6 ,p0_6,p1_6, p2_6);
 		//BLOCK 7
 		const int D7[CHAN_2]={
 #include "d_7"
@@ -193,7 +199,7 @@ void shift(hls::stream<DataType>  tensor[C], hls::stream<DataType> act[N]){
 		const DataType p1_7[CHAN_2][CHAN_2]={
 #include "p1_7"
 		};
-		MulChan::_shift<DataType, DIM_2, 1, 1, CHAN_2, 1, CHAN_2, 16 * REX>(s_act6, s_act7, D7 ,p0_7,p1_7);
+		MulChan::_shift<DataType, DIM_2, CHAN_2, 1, 16 * REX>(s_act6, s_act7, D7 ,p0_7,p1_7);
 		//BLOCK 8
 		const int D8[CHAN_2]={
 #include "d_8"
@@ -204,7 +210,7 @@ void shift(hls::stream<DataType>  tensor[C], hls::stream<DataType> act[N]){
 		const DataType p1_8[CHAN_2][CHAN_2]={
 #include "p1_8"
 		};
-		MulChan::_shift<DataType, DIM_2, 1, 1, CHAN_2, 1, CHAN_2,16 * REX>(s_act7, s_act8, D8 ,p0_8,p1_8);
+		MulChan::_shift<DataType, DIM_2, CHAN_2,1, 16 * REX>(s_act7, s_act8, D8 ,p0_8,p1_8);
 
 
 		const DataType p_9[DIM_2 * DIM_2* CHAN_2][N]={

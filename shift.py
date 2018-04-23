@@ -69,6 +69,12 @@ def main():
 		np.savetxt(r"params/p1_%d"%idx, p1.reshape([1, -1]), delimiter=',')
 		t_act = tf.nn.relu(tf.nn.conv2d(t_shift,p1,strides=[1,stride, stride,1],
 					padding="VALID"), name="block_%d"%idx)
+		if in_c!=out_c or stride !=1 :
+			p2 = np.random.normal(scale=1/np.sqrt(in_c),size=(1, 1, in_c , out_c))
+			np.savetxt(r"params/p2_%d"%idx, p2.reshape([1, -1]), delimiter=',')
+			t_shortcut = tf.nn.conv2d(fmap, p2, strides=[1, stride, stride, 1],
+					padding="VALID")
+			t_act = t_act+t_shortcut
 		return t_act
 
 
