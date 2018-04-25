@@ -100,6 +100,20 @@ namespace MulChan{
 		}
 	
 	template<typename T, int D, int C, int IIs>
+		void _bias_add(hls::stream<T> fmap[C], const T bias[C], hls::stream<T> out[C]){
+#pragma HLS ARRAY_PARTITION variable=fmap complete dim=1
+#pragma HLS ARRAY_PARTITION variable=bias complete dim=1
+#pragma HLS ARRAY_PARTITION variable=out complete dim=1
+			for(int i=0;i<D;i++){
+				for(int j=0;j<D;j++){
+#pragma HLS PIPELINE II=IIs
+					for(int k=0;k<C;k++){
+						out[k].write(fmap[k].read() + bias[k]);
+					}
+				}
+			}
+		}
+	template<typename T, int D, int C, int IIs>
 		void _add(hls::stream<T> fmap_0[C], hls::stream<T> fmap_1[C], hls::stream<T> out[C]){
 #pragma HLS ARRAY_PARTITION variable=fmap_0 complete dim=1
 #pragma HLS ARRAY_PARTITION variable=fmap_1 complete dim=1
@@ -212,18 +226,22 @@ namespace MulChan{
 				hls::stream<T> output[IP],
 				const int Dx[IP * E],
 				const T p0[IP][IP * E],
-				const T p1[IP * E][IP]
+				const T p1[IP * E][IP],
+				const T bias0[IP*E],
+				const T bias1[IP]
 				){
 			static const int MP = IP * E;
 
 #pragma HLS INLINE
-			hls::stream<DataType> f_conv0[MP], f_shift[MP],f_conv1[IP], f_relu[MP];
+			hls::stream<DataType> f_conv0[MP], f_bias0[MP], f_shift[MP],f_conv1[IP], f_bias1[IP], f_relu[MP];
 
 			_conv2d_1x1<DataType,D, IP, MP, 1, IIs>(input, f_conv0, p0);
-			_relu<DataType, D, MP, IIs>(f_conv0, f_relu);
+			_bias_add<DataType, D, MP, IIs>(f_conv0, bias0, f_bias0);
+			_relu<DataType, D, MP, IIs>(f_bias0, f_relu);
 			_shift_3x3<DataType, D, MP, 1, IIs>(f_relu, f_shift, Dx);
 			_conv2d_1x1<DataType,D, MP, IP, 1, IIs>(f_shift, f_conv1, p1);
-			_relu<DataType, D, IP, IIs>(f_conv1, output);
+			_bias_add<DataType, D, IP, IIs>(f_conv1, bias1,f_bias1);
+			_relu<DataType, D, IP, IIs>(f_bias1, output);
 		}
 	template<typename T, int D, int S_conv, int IP, int E, int OP, int IIs>
 		void _shift_res(hls::stream<T> input[IP],
@@ -231,7 +249,9 @@ namespace MulChan{
 				const int Dx[IP * E],
 				const T p0[IP][IP * E],
 				const T p1[IP * E][OP],
-				const T p2[IP][OP]
+				const T p2[IP][OP],
+				const T bias0[IP*E],
+				const T bias1[OP]
 				){
 			static const int MP = IP * E;
 			static const int nD = (D - 1)/S_conv + 1;
@@ -240,14 +260,16 @@ namespace MulChan{
 			hls::stream<DataType> f_in0[IP], f_in1[IP];
 			_duplicate<DataType, D, IP, IIs>(input, f_in0, f_in1);
 
-			hls::stream<DataType> f_conv0[MP], f_shift[MP], f_relu[MP];
-			hls::stream<DataType> f_conv1[OP],f_relu1[OP], f_shortcut[OP];
+			hls::stream<DataType> f_conv0[MP],f_bias0[MP], f_shift[MP], f_relu[MP];
+			hls::stream<DataType> f_conv1[OP],f_bias1[OP], f_relu1[OP], f_shortcut[OP];
 
 			_conv2d_1x1<DataType,D, IP, MP, 1, IIs>(f_in0, f_conv0, p0);
-			_relu<DataType, D, MP, IIs>(f_conv0, f_relu);
+			_bias_add<DataType, D, MP, IIs>(f_conv0, bias0, f_bias0);
+			_relu<DataType, D, MP, IIs>(f_bias0, f_relu);
 			_shift_3x3<DataType, D, MP, 1, IIs>(f_relu, f_shift, Dx);
 			_conv2d_1x1<DataType,D, MP, OP, S_conv, IIs>(f_shift, f_conv1, p1);
-			_relu<DataType, nD, OP, IIs>(f_conv1, f_relu1);
+			_bias_add<DataType, nD, OP, IIs>(f_conv1, bias1,f_bias1);
+			_relu<DataType, nD, OP, IIs>(f_bias1, f_relu1);
 
 			_conv2d_1x1<DataType, D, IP, OP, S_conv, IIs>(f_in1, f_shortcut, p2);
 			_add<DataType, nD, OP, IIs>(f_relu1, f_shortcut, output);

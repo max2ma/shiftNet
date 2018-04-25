@@ -49,26 +49,30 @@ def shift(tensor, kx, ky):
 def main():
 	D = 32
 	C = 3
+	N = 10
 	tensor = np.random.normal(size=(D, D, C))
 	np.savetxt(r"params/input", tensor.reshape([1, -1]), delimiter=',')
 	
 	kernel = np.random.normal(size=(3, 3, C, 16))
 	np.savetxt(r"params/t_k", kernel.reshape([1, -1]), delimiter=',')
 
-	fc = np.random.normal(size=(8, 8, 64, 10))
-	np.savetxt(r"params/p_9", fc.reshape([1, -1]), delimiter=',')
 	
 	def block(idx ,fmap, in_c, out_c, ex,  stride):
 		p0 = np.random.normal(scale=1/np.sqrt(in_c),size=(1, 1, in_c, in_c * ex))
 		np.savetxt(r"params/p0_%d"%idx, p0.reshape([1, -1]), delimiter=',')
 		t_conv0 = tf.nn.conv2d(fmap,p0,strides=[1,1,1,1],
 					padding="VALID")
-		t_relu=tf.nn.relu(t_conv0)
+		bias0 = np.random.normal(scale=1/np.sqrt(in_c*ex), size=in_c*ex)
+		np.savetxt(r"params/bias0_%d"%idx, bias0.reshape([1, -1]), delimiter=',')
+		t_relu=tf.nn.relu(tf.nn.bias_add(t_conv0, bias0))
 		t_shift=shift(idx, t_relu, in_c*ex)
 		p1 = np.random.normal(scale=1/np.sqrt(out_c),size=(1, 1, in_c * ex, out_c))
 		np.savetxt(r"params/p1_%d"%idx, p1.reshape([1, -1]), delimiter=',')
-		t_act = tf.nn.relu(tf.nn.conv2d(t_shift,p1,strides=[1,stride, stride,1],
-					padding="VALID"), name="block_%d"%idx)
+		t_conv1 = tf.nn.conv2d(t_shift,p1,strides=[1,stride, stride,1],
+					padding="VALID")
+		bias1 = np.random.normal(scale=1/np.sqrt(out_c), size=out_c)
+		np.savetxt(r"params/bias1_%d"%idx, bias1.reshape([1, -1]), delimiter=',')
+		t_act = tf.nn.relu(tf.nn.bias_add(t_conv1, bias1), name="block_%d"%idx)
 		if in_c!=out_c or stride !=1 :
 			p2 = np.random.normal(scale=1/np.sqrt(in_c),size=(1, 1, in_c , out_c))
 			np.savetxt(r"params/p2_%d"%idx, p2.reshape([1, -1]), delimiter=',')
@@ -87,7 +91,6 @@ def main():
 	g =tf.Graph()
 	with g.as_default():
 		t_im = tf.constant(tensor, dtype=tf.float32, shape=[1,D,D,C])
-		p_9 = tf.constant(np.reshape(fc, [-1, 10]), dtype=tf.float32)
 		t_conv = tf.nn.conv2d(t_im, kernel, strides=[1,1,1,1], padding="SAME")
 		t_act0 = block(0, t_conv, 16, 16, 1, 1)
 		t_act1 = block(1, t_act0, 16, 16, 1, 1)
@@ -99,8 +102,13 @@ def main():
 		t_act7 = block(7, t_act6, 64, 64, 1, 1)
 		t_act8 = block(8, t_act7, 64, 64, 1, 1)
 		t_arr = tf.reshape(t_act8, [1, -1])
-		t_cifar = tf.nn.relu(tf.matmul(t_arr, p_9))
-		#t_act=shift(0,t_im, C)
+		p_9 = np.random.normal(size=(t_arr.shape[1], 10))
+		np.savetxt(r"params/p_9", p_9.reshape([1, -1]), delimiter=',')
+		t_fc = tf.matmul(t_arr, tf.constant(p_9, dtype=tf.float32))
+		
+		bias_9 = np.random.normal(size=N)
+		np.savetxt(r"params/bias_9", bias_9.reshape([1, -1]), delimiter=',')
+		t_cifar = tf.nn.relu(tf.nn.bias_add(t_fc, bias_9))
 	with tf.Session(graph=g) as sess:
 		n_cifar= sess.run(t_cifar)
 		np.savetxt("t_cifar", n_cifar.reshape([1, -1]), delimiter=',')
