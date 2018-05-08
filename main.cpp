@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <cmath>
 #include "hls_stream.h"
 #include "para.h"
@@ -10,62 +11,63 @@ void shift(hls::stream<DataType> *tensor, hls::stream<DataType>* act);
 
 int main(){
 	DataType input[D][D][C] = {
-#include "input"
+#include "inputs_batch_0"
+		//#include "t_im"
 	};
 
 	float ref[N] = {
-#include "t_cifar"
+#include "outputs_batch_0"
+		//#include "t_cifar"
 	};
 
-	DataType out[N];
+	hls::stream<DataType> istream[C], ostream[N];
+	int err = 0, TT =N;
+	float ave = 0;
 
-#if defined MUL_NET
-hls::stream<DataType> istream[C], ostream[N];
-#endif
+	DataType in, r;
+	char c;
 
-for(int i=0;i<D;i++)
-		for(int j=0;j<D;j++)
-			for(int k=0;k<C;k++)
-#if defined MUL_NET
+	for(int i=0;i<D;i++){
+		for(int j=0;j<D;j++){
+			for(int k=0;k<C;k++){
 				istream[k].write(input[i][j][k]);
-#endif
-
+			}
+		}
+	}
 	shift(istream, ostream);
 
 
-	int err = 0, TT = D*D*N;
-	float ave = 0;
-			for(int k=0;k<N;k++){
-#if defined MUL_NET
-				DataType output = ostream[k].read();
-#endif
-#ifdef FIXED
-				float diff = abs(( output - (DataType)ref[k]).to_float());
-				ave+=diff;
-#else
-				if(ref[k] == 0.0){
-					TT --;
-					if(output == 0.0)
-					continue;
-					else
-						err ++;
-				}
-				float diff = abs(output / ref[k] - 1);// ref[i][j][k]);
-				ave+=diff;
-#endif
-				if (diff > 1e-1){
-					err ++;
-					cout	<<k<<','
-							<<output<<','
-							<<ref[k]
-							<<endl;
 
-				}
-			}
+	for(int k=0;k<N;k++){
+		r = ref[k];
+		DataType output = ostream[k].read();
+#ifdef FIXED
+		float diff = abs(( output - (DataType)r).to_float());
+		ave+=diff;
+#else
+		if(r == 0.0){
+			TT --;
+			if(output == 0.0)
+				continue;
+			else
+				err ++;
+		}
+		float diff = abs(output / r - 1);// ref[i][j][k]);
+		ave+=diff;
+#endif
+		if (diff > 1e-1)
+			err ++;
+		cout	<<k<<','
+			<<output<<','
+			<<r << ','
+			<<endl;
+	}
 	cout << "there are in total " << err << " errors."<<endl;
 	cout << "the ave error is " << ave/TT << " ."<<endl;
-	if(err == 0)
+	if(err == 0){
 		return 0;
-	else
+	}
+	else {
 		return -1;
+	}
 }

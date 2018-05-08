@@ -13,4 +13,4 @@ create_clock -period 5 -name default
 config_compile -name_max_length 50 -pipeline_loops 0 -unsafe_math_optimizations
 csim_design -compiler gcc
 csynth_design
-#cosim_design
+cosim_design
