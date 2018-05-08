@@ -22,17 +22,14 @@ void padding(hls::stream<T> fmap[C], hls::stream<T> omap[C]){
 
 template<typename T, int D, int C, int K, int S, int IIs>
 void conv2d_3x3(hls::stream<T> fmap[C], const T kernel[3][3][C][K], hls::stream<T> omap[K]){
-#pragma HLS ARRAY_PARTITION variable=kernel complete dim=1
-#pragma HLS ARRAY_PARTITION variable=kernel complete dim=2
-#pragma HLS ARRAY_PARTITION variable=kernel complete dim=3
-#pragma HLS ARRAY_PARTITION variable=kernel complete dim=4
+#pragma HLS ARRAY_PARTITION variable=kernel complete dim=0
 
 #pragma HLS INLINE
 
 	static const int nD = (D - 3)/S + 1;
 	T buffer[2][D][C];
 #pragma HLS ARRAY_PARTITION variable=buffer complete dim=3
-#pragma HLS ARRAY_PARTITION variable=buffer complete dim=1
+//#pragma HLS ARRAY_PARTITION variable=buffer complete dim=1
 	T crop[3][3][C];
 #pragma HLS ARRAY_PARTITION variable=crop complete dim=0
 	T sum[K];
