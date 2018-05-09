@@ -4,6 +4,10 @@
 
 #ifdef FIXED
 typedef ap_fixed<32, 10> DataType;
+#elif defined FLOAT
+typedef float DataType;
+#elif defined DOUBLE
+typedef double DataType;
 #else
 typedef half DataType;
 #endif

@@ -21,7 +21,6 @@ namespace net{
 	};
 	//BLOCK 0
 	const DataType p0_0[CHAN_0][CHAN_0 * EXP]={
-//#include "layer1.0.conv1.weight"
 #include "p0_0"
 	};
 	const DataType p1_0[CHAN_0 * EXP][CHAN_0]={
