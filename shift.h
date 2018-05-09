@@ -69,7 +69,6 @@ namespace MulChan{
 		}
 	template<typename T, int D, int C, int S, int IIs>
 		void _shift_3x3(hls::stream<T> fmap[C], hls::stream<T> omap[C]){
-
 #pragma HLS INLINE
 
 			const static int G = (C/9) * 9;
@@ -123,6 +122,7 @@ namespace MulChan{
 		}
 	template<typename T, int D, int C, int S, int IIs>
 		void _max_pool(hls::stream<T> fmap[C], hls::stream<T> out[C]){
+#pragma HLS INLINE
 #pragma HLS ARRAY_PARTITION variable=out complete dim=1
 #pragma HLS ARRAY_PARTITION variable=fmap complete dim=1
 			static const int nD = D/S;
@@ -154,6 +154,7 @@ namespace MulChan{
 		}
 	template<typename T, int D, int C, int S, int IIs>
 		void _avg_pool(hls::stream<T> fmap[C], hls::stream<T> out[C]){
+#pragma HLS INLINE
 #pragma HLS ARRAY_PARTITION variable=out complete dim=1
 #pragma HLS ARRAY_PARTITION variable=fmap complete dim=1
 			static const int nD = D/S;
@@ -198,6 +199,7 @@ namespace MulChan{
 
 	template<typename T, int D, int C, int IIs>
 		void _bias_add(hls::stream<T> fmap[C], const T bias[C], hls::stream<T> out[C]){
+#pragma HLS INLINE
 #pragma HLS ARRAY_PARTITION variable=fmap complete dim=1
 #pragma HLS ARRAY_PARTITION variable=bias complete dim=1
 #pragma HLS ARRAY_PARTITION variable=out complete dim=1
@@ -212,6 +214,7 @@ namespace MulChan{
 		}
 	template<typename T, int D, int C, int IIs>
 		void _add(hls::stream<T> fmap_0[C], hls::stream<T> fmap_1[C], hls::stream<T> out[C]){
+#pragma HLS INLINE
 #pragma HLS ARRAY_PARTITION variable=fmap_0 complete dim=1
 #pragma HLS ARRAY_PARTITION variable=fmap_1 complete dim=1
 #pragma HLS ARRAY_PARTITION variable=out complete dim=1
@@ -225,14 +228,15 @@ namespace MulChan{
 			}
 		}
 
-	template<typename T, int D, int C, int IIs>
+	template<typename T, int D, int C>
 		void _duplicate(hls::stream<T> fmap[C], hls::stream<T> out_0[C], hls::stream<T> out_1[C]){
+#pragma HLS INLINE
 #pragma HLS ARRAY_PARTITION variable=fmap complete dim=1
 #pragma HLS ARRAY_PARTITION variable=out_0 complete dim=1
 #pragma HLS ARRAY_PARTITION variable=out_1 complete dim=1
 			for(int i=0;i<D;i++){
 				for(int j=0;j<D;j++){
-#pragma HLS PIPELINE II=IIs
+#pragma HLS PIPELINE 
 					for(int k=0;k<C;k++){
 						T r = fmap[k].read();
 						out_0[k].write(r);
@@ -243,6 +247,7 @@ namespace MulChan{
 		}
 	template<typename T, int D, int C, int IIs>
 		void _relu(hls::stream<T> fmap[C], hls::stream<T> out[C]){
+#pragma HLS INLINE
 #pragma HLS ARRAY_PARTITION variable=fmap complete dim=1
 #pragma HLS ARRAY_PARTITION variable=out complete dim=1
 			for(int i=0;i<D;i++){
@@ -261,6 +266,7 @@ namespace MulChan{
 
 	template<typename T, int D, int C, int N, int S, int IIs>
 		void _conv2d_1x1(hls::stream<T> fmap[C], hls::stream<T> out[N], const T p[C][N]){
+#pragma HLS INLINE
 
 #pragma HLS ARRAY_PARTITION variable=p complete dim=0
 #pragma HLS ARRAY_PARTITION variable=fmap complete dim=1
@@ -296,6 +302,7 @@ namespace MulChan{
 		}
 	template<typename T, int D, int C, int N, int IIs>
 		void _matMul(hls::stream<T> fmap[C], hls::stream<T> out[N], const T p[D*D*C][N]){
+#pragma HLS INLINE
 #pragma HLS ARRAY_PARTITION variable=p complete dim=2
 			T sum[N], r[C];
 #pragma HLS ARRAY_PARTITION variable=sum complete dim=1
@@ -330,7 +337,8 @@ namespace MulChan{
 
 #pragma HLS INLINE
 			hls::stream<DataType> f_in0[IP], f_in1[IP];
-			_duplicate<DataType, D, IP, IIs>(input, f_in0, f_in1);
+#pragma HLS STREAM VARIABLE=f_in1 DEPTH=D*2
+			_duplicate<DataType, D, IP>(input, f_in0, f_in1);
 
 			hls::stream<DataType> f_conv0[MP], f_bias0[MP], f_shift[MP],f_conv1[IP], f_bias1[IP], f_relu[MP], f_relu1[IP];
 
@@ -359,7 +367,8 @@ namespace MulChan{
 
 #pragma HLS INLINE
 			hls::stream<DataType> f_in0[IP], f_in1[IP];
-			_duplicate<DataType, D, IP, IIs>(input, f_in0, f_in1);
+#pragma HLS STREAM VARIABLE=f_in1 DEPTH=D*2
+			_duplicate<DataType, D, IP>(input, f_in0, f_in1);
 
 			hls::stream<DataType> f_conv0[MP],f_bias0[MP], f_shift[MP], f_relu[MP];
 			hls::stream<DataType> f_conv1[OP],f_bias1[OP], f_relu1[OP], f_shortcut[OP], f_bias2[OP];
