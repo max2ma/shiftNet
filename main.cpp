@@ -6,61 +6,53 @@
 using namespace std;
 using namespace para;
 
-extern
-void shift(hls::stream<DataType> *tensor, hls::stream<DataType>* act);
+extern "C"
+void shift(float *tensor, float* act);
 
 int main(){
-	DataType input[D][D][C] = {
+	float input[D *D*C] = {
 #include "inputs_batch_0"
 		//#include "t_im"
 	};
 
+	float out[N];
 	float ref[N] = {
-#include "outputs_batch_0"
+//#include "outputs_batch_0"
+#include "t_l1"
 		//#include "t_cifar"
 	};
 
-	hls::stream<DataType> istream[C], ostream[N];
 	int err = 0, TT =N;
 	float ave = 0;
 
-	DataType in, r;
-	char c;
+	shift(input, out);
 
-	for(int i=0;i<D;i++){
-		for(int j=0;j<D;j++){
-			for(int k=0;k<C;k++){
-				istream[k].write(input[i][j][k]);
-			}
-		}
-	}
-	shift(istream, ostream);
-
+	float eps = 1e-6;
 
 
 	for(int k=0;k<N;k++){
-		r = ref[k];
-		DataType output = ostream[k].read();
-#ifdef FIXED
-		float diff = abs(( output - (DataType)r).to_float());
-		ave+=diff;
-#else
-		if(r == 0.0){
+		if(ref[k] <= eps){
 			TT --;
-			if(output == 0.0)
+			if(out[k] <=eps)
 				continue;
-			else
+			else{
 				err ++;
+		cout	<<k<<','
+			<<out[k]<<','
+			<<ref[k] << ','
+			<<endl;
+				continue;
+			}
 		}
-		float diff = abs(output / r - 1);// ref[i][j][k]);
+		float diff = abs(out[k] / ref[k]- 1);// ref[i][j][k]);
 		ave+=diff;
-#endif
-		if (diff > 1e-1)
+		if (diff > 1e-1){
 			err ++;
 		cout	<<k<<','
-			<<output<<','
-			<<r << ','
+			<<out[k]<<','
+			<<ref[k] << ','
 			<<endl;
+		}
 	}
 	cout << "there are in total " << err << " errors."<<endl;
 	cout << "the ave error is " << ave/TT << " ."<<endl;
