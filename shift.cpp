@@ -1,17 +1,21 @@
 #include <cstring>
 #include "hls_stream.h"
+#include "dataType.h"
 #include "para.h"
 #include "shift.h"
 #include "conv2d.h"
 using namespace para;
 #include "weights.h"
 using namespace net;
+#include "dma.h"
 
-void shift(hls::stream<DataType>  tensor[C], hls::stream<DataType> act[N]){
-#pragma HLS INTERFACE s_axilite port=return
-#pragma HLS INTERFACE axis register both port=tensor
-#pragma HLS INTERFACE axis register both port=act
-
+extern "C"
+void shift(float *input, float *output){
+#pragma HLS INTERFACE m_axi port=input offset=slave bundle=gmem depth=D*D*C
+#pragma HLS INTERFACE m_axi port=output offset=slave bundle=gmem depth=N
+#pragma HLS INTERFACE s_axilite port=input bundle=control
+#pragma HLS INTERFACE s_axilite port=output bundle=control
+#pragma HLS INTERFACE s_axilite port=return bundle=control
 
 
 		static const int EXP = 1;
@@ -28,9 +32,13 @@ void shift(hls::stream<DataType>  tensor[C], hls::stream<DataType> act[N]){
 
 
 #pragma HLS DATAFLOW
+		// M2S
+		hls::stream<DataType> s_ten[C];
+		
+		M2S<float, DataType, DIM_0, C>(input, s_ten);
 		// 3x3 conv2d
 		hls::stream<DataType> s_conv[CHAN_0], s_pad[C], s_convBias[CHAN_0], s_relu[CHAN_0];
-		padding<DataType,D, C, 1, REX>(tensor, s_pad);
+		padding<DataType,D, C, 1, REX>(s_ten, s_pad);
 		conv2d_3x3<DataType, D + 2, C, CHAN_0, 1, REX>(s_pad, kernel, s_conv);
 		MulChan::_bias_add<DataType, D,CHAN_0, REX>(s_conv, bias0, s_convBias);
 		MulChan::_relu<DataType, D,CHAN_0, REX>(s_convBias, s_relu);
@@ -67,10 +75,13 @@ void shift(hls::stream<DataType>  tensor[C], hls::stream<DataType> act[N]){
 		hls::stream<DataType> s_pool[CHAN_2];
 		MulChan::_avg_pool<DataType, DIM_2, CHAN_2, 8, 16 * REX>(s_act8, s_pool);
 		// fully-connected 
-		hls::stream<DataType> s_fc[N], s_fcBias[N];
+		hls::stream<DataType> s_fc[N], s_fcBias[N], s_act[N];
 		MulChan::_matMul<DataType, DIM_3, CHAN_2, N, 16 * REX>(s_pool, s_fc, p_9);
-		MulChan::_bias_add<DataType, 1, N, 16*REX>(s_fc, bias_9, act);
+		MulChan::_bias_add<DataType, 1, N, 16*REX>(s_fc, bias_9, s_act);
 //		MulChan::_relu<DataType, 1, N, 16*REX>(s_fcBias, act);
+
+//		S2M
+		S2M<DataType, float, 1, N>(s_act, output);
 }
 
 
