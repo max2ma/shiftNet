@@ -1,7 +1,19 @@
 #pragma once
+#include "utils/x_hls_traits.h"
 #include "hls_stream.h"
 
-
+template<unsigned int VALUE>
+struct CE_LOG2{
+	static const unsigned int V = CE_LOG2<(VALUE >> 1)>::V + 1;
+};
+template<>
+struct CE_LOG2<1>{
+	static const unsigned int V = 1;
+};
+template<>
+struct CE_LOG2<0>{
+	static const unsigned int V = 0;
+};
 
 template<typename T, int D, int C, int P, int IIs>
 void padding(hls::stream<T> fmap[C], hls::stream<T> omap[C]){
@@ -20,27 +32,22 @@ void padding(hls::stream<T> fmap[C], hls::stream<T> omap[C]){
 		}
 }
 
-template<typename T, int D, int C, int K, int S, int IIs>
-void conv2d_3x3(hls::stream<T> fmap[C], const T kernel[3][3][C][K], hls::stream<T> omap[K]){
+template<typename T_IN, typename T_W, typename T_OUT, int D, int C, int K, int S, int IIs>
+void conv2d_3x3(hls::stream<T_IN> fmap[C], const T_W kernel[3][3][C][K], hls::stream<T_OUT> omap[K]){
 #pragma HLS ARRAY_PARTITION variable=kernel complete dim=0
 
 #pragma HLS INLINE
 
 	static const int nD = (D - 3)/S + 1;
-	T buffer[2][D][C];
+	T_IN buffer[2][D][C];
 #pragma HLS ARRAY_PARTITION variable=buffer complete dim=3
 //#pragma HLS ARRAY_PARTITION variable=buffer complete dim=1
-	T crop[3][3][C];
+	T_IN crop[3][3][C];
 #pragma HLS ARRAY_PARTITION variable=crop complete dim=0
-	T sum[K];
+	typedef typename hls::x_traits<T_IN, T_W>::MULT_T MULT_T;
+	typedef typename hls::x_traits<MULT_T, ap_uint<CE_LOG2<9>::V> >::MULT_T SUM_T;
+	SUM_T sum[K];
 #pragma HLS ARRAY_PARTITION variable=sum complete dim=0
-/*
-	for(int i=0;i<2;i++)
-		for(int j=0;j<D;j++)
-#pragma HLS PIPELINE
-			for(int c=0;c<C;c++)
-				buffer[i][j][c] = fmap[c].read();
-*/
 	for(int i=0;i<D;i++){
 		for(int j=0;j<D;j++){
 #pragma HLS PIPELINE II=IIs
@@ -71,24 +78,26 @@ void conv2d_3x3(hls::stream<T> fmap[C], const T kernel[3][3][C][K], hls::stream<
 						for(int fj = 0; fj<3;fj++)
 							sum[k] += crop[fi][fj][c] * kernel[fi][fj][c][k];
 				if(j>=2 && i>=2 && b_out)
-					omap[k].write(sum[k]);
+					omap[k].write((T_OUT)sum[k]);
 			}
 		}
 	}
 
 }
-template<typename T, int D, int C, int F, int K, int S, int IIs>
-void conv2d(hls::stream<T> fmap[C], const T kernel[F][F][C][K], hls::stream<T> omap[K]){
+template<typename T_IN, typename T_W, typename T_OUT, int D, int C, int F, int K, int S, int IIs>
+void conv2d(hls::stream<T_IN> fmap[C], const T_W kernel[F][F][C][K], hls::stream<T_OUT> omap[K]){
 
 #pragma HLS INLINE
 
 	static const int nD = (D - F)/S + 1;
-	T buffer[F-1][D][C];
+	T_IN buffer[F-1][D][C];
 #pragma HLS ARRAY_PARTITION variable=buffer complete dim=3
 #pragma HLS ARRAY_PARTITION variable=buffer complete dim=1
-	T crop[F][F][C];
+	T_IN crop[F][F][C];
 #pragma HLS ARRAY_PARTITION variable=crop complete dim=0
-	T sum[K];
+	typedef typename hls::x_traits<T_IN, T_W>::MULT_T MULT_T;
+	typedef typename hls::x_traits<MULT_T, ap_uint<CE_LOG2<F*F>::V> >::MULT_T SUM_T;
+	SUM_T sum[K];
 //#pragma HLS ARRAY_PARTITION variable=sum complete dim=0
 /*
 	for(int i=0;i<F-1;i++)
@@ -125,9 +134,9 @@ void conv2d(hls::stream<T> fmap[C], const T kernel[F][F][C][K], hls::stream<T> o
 				for(int c = 0;c<C;c++)
 					for(int fi = 0; fi<F;fi++)
 						for(int fj = 0; fj<F;fj++)
-							sum[k] += crop[fi][fj][c] * kernel[fi][fj][c][k];
+							sum[k] += crop[fi][fj][c] * kernel[fi][fj][c][k].to_float();
 				if(b_out)
-					omap[k].write(sum[k]);
+					omap[k].write((T_OUT)sum[k]);
 			}
 		}
 	}
