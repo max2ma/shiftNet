@@ -5,69 +5,6 @@
 namespace MulChan{
 
 	template<typename T, int D, int C, int S, int IIs>
-		void _shift_3x3S(hls::stream<T> fmap[C], hls::stream<T> out[C], const int Dx[C]){
-			static const int nD = (D - 1)/S + 1;
-#pragma HLS ARRAY_PARTITION variable=Dx complete dim=1
-#pragma HLS ARRAY_PARTITION variable=fmap complete dim=1
-#pragma HLS ARRAY_PARTITION variable=out complete dim=1
-			T buffer[2][D][C];
-#pragma HLS ARRAY_PARTITION variable=buffer complete dim=3
-			for(int i=0;i<D;i++)
-#pragma HLS PIPELINE
-				for(int j=0;j<C;j++){
-					T r = fmap[j].read();
-					buffer[0][i][j] = r;
-					buffer[1][i][j] = 0;
-				}
-			for(int i=0;i<D;i++){
-				for(int j=0;j<D;j++){
-#pragma HLS PIPELINE II = IIs
-					for(int k=0;k<C;k++){
-						T r,w;
-						if(i != D -1)
-							r = fmap[k].read();
-						else
-							r = 0;
-
-						int ci = i & 0x01;
-						int ni = ci ^ 0x01;
-
-						switch(Dx[k]){
-							case 0:// No MOVE
-								w = buffer[ci][j][k];
-								buffer[ni][j][k] = r;
-								break;
-							case 1:// MOVE DOWN
-								w = buffer[ni][j][k];
-								buffer[ni][j][k] = r;
-								break;
-							case -1: // MOVE UP
-								w = r;
-								break;
-							case 2: // MOVE RIGHT
-								buffer[ni][j][k] = r;
-								if(j == 0) {
-									w = 0;
-								} else
-									w = buffer[ci][j - 1][k];
-								break;
-							case -2:// MOVE LEFT
-								buffer[ni][j][k] = r;
-								if(j == D - 1) {
-									w = 0;
-								} else
-									w = buffer[ci][j + 1][k];
-								break;
-							default:
-								break;
-						}
-						if(i % S == 0 && j % S ==0)
-							out[k].write(w);
-					}
-				}
-			}
-		}
-	template<typename T, int D, int C, int S, int IIs>
 		void _shift_3x3(hls::stream<T> fmap[C], hls::stream<T> omap[C]){
 #pragma HLS INLINE
 
