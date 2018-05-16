@@ -14,3 +14,4 @@ config_compile -name_max_length 50 -pipeline_loops 0 -unsafe_math_optimizations
 csim_design -compiler gcc
 csynth_design
 cosim_design
+export_design -format ip_catalog
