@@ -37,15 +37,15 @@ using namespace para;
 
 namespace Params
 {
-	char *kernel_name=NULL;     // -n
+	char *kernel_name="shift";     // -n
 	char *binary_name=NULL;     // -a
 }
 void usage(char* name)
 {
-    cout<<"Usage: "<<name
-        <<" -b opencl_binary_name"
-        <<" -n kernel_name"
-        <<endl;
+	cout<<"Usage: "<<name
+		<<" -b opencl_binary_name"
+		<<" -n kernel_name"
+		<<endl;
 }
 int main(int argc, char** argv)
 {
@@ -67,121 +67,125 @@ int main(int argc, char** argv)
 		}
 	}
 	// Check the mandatory argument.
-	if(!flagn || !flaga) {
+	if(!flaga) {
 		usage(argv[0]);
 		return -1;
 	}
 	ifstream ifstr(Params::binary_name);
 	const string programString(istreambuf_iterator<char>(ifstr),
-		(istreambuf_iterator<char>()));
-	float input[D][D][C] = {
-#include "inputs_batch_0"
+			(istreambuf_iterator<char>()));
+	float input[BATCH][D][D][C] = {
+#include "inputs_batch_32"
 		//#include "t_im"
 	};
 
-	float ref[N] = {
-//#include "t_l1"
-#include "outputs_batch_0"
+	float ref[BATCH][N] = {
+		//#include "t_l1"
+#include "outputs_batch_32"
 		//#include "t_cifar"
 	};
-	vector<float, aligned_allocator<float> > h_im(D*D*C), h_out(N);
-	for(int i=0;i<D;i++)
-		for(int j=0;j<D;j++)
-			for(int c=0;c<C;c++)
-				h_im[i*D*C+j*C+c]=input[i][j][c];
 	int err = 0, TT =N;
 	float ave = 0;
+	vector<float, aligned_allocator<float> > h_im(D*D*C), h_out(BATCH * N);
 
-	try
-	{
-		vector<cl::Platform> platforms;
-		cl::Platform::get(&platforms);
-
-		cl::Context context(CL_DEVICE_TYPE_ACCELERATOR);
-		vector<cl::Device> devices=context.getInfo<CL_CONTEXT_DEVICES>();
-
-		cl::Program::Binaries binaries(1, make_pair(programString.c_str(), programString.length()));
-		cl::Program program(context,devices,binaries);
 		try
 		{
-			program.build(devices);
+			vector<cl::Platform> platforms;
+			cl::Platform::get(&platforms);
+
+			cl::Context context(CL_DEVICE_TYPE_ACCELERATOR);
+			vector<cl::Device> devices=context.getInfo<CL_CONTEXT_DEVICES>();
+
+			cl::Program::Binaries binaries(1, make_pair(programString.c_str(), programString.length()));
+			cl::Program program(context,devices,binaries);
+			try
+			{
+				program.build(devices);
+			}
+			catch (cl::Error err)
+			{
+				if (err.err() == CL_BUILD_PROGRAM_FAILURE)
+				{
+					string info;
+					program.getBuildInfo(devices[0],CL_PROGRAM_BUILD_LOG, &info);
+					cout << info << endl;
+					return EXIT_FAILURE;
+				}
+				else throw err;
+			}
+
+			cl::CommandQueue commandQueue(context, devices[0]);
+
+			//		typedef cl::make_kernel<cl::Buffer,cl::Buffer,float,float,float,float,float,float,float,float,float,float,float> kernelType;
+			//		kernelType kernelFunctor = kernelType(program, Params::kernel_name);
+
+			cl::Kernel kernel(program,Params::kernel_name);
+			auto kernelFunctor = cl::KernelFunctor<cl::Buffer,cl::Buffer>(kernel);
+
+			cl::Buffer d_im(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY,
+					sizeof(float)*D*D*C, h_im.data());
+			cl::Buffer d_out(context, CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY,
+					sizeof(float)*N, h_out.data());
+
+			std::vector<cl::Memory> inBufVec, outBufVec;
+			inBufVec.push_back(d_im);
+			outBufVec.push_back(d_out);
+			
+			clock_t start = clock();
+			for(int b=0;b<BATCH;b++){
+				for(int i=0;i<D;i++)
+					for(int j=0;j<D;j++)
+						for(int c=0;c<C;c++)
+							h_im[i*D*C+j*C+c]=input[b][i][j][c];
+				commandQueue.enqueueMigrateMemObjects(inBufVec,0);
+				cl::EnqueueArgs enqueueArgs(commandQueue,cl::NDRange(1),cl::NDRange(1));
+				cl::Event event = kernelFunctor(enqueueArgs,
+						d_im,d_out
+						);
+
+				commandQueue.enqueueMigrateMemObjects(outBufVec,CL_MIGRATE_MEM_OBJECT_HOST);
+				commandQueue.finish();
+				event.wait();
+
+				for(int k=0;k<N;k++){
+					float r = *(ref[b]+k);
+					float output = h_out[k];
+					if(r == 0.0){
+						TT --;
+						if(output == 0.0)
+							continue;
+						else
+							err ++;
+					}
+					float diff = abs(output / r - 1);// ref[i][j][k]);
+					ave+=diff;
+					if (diff > 1e-1){
+						err ++;
+						cout	<<k<<','
+							<<output<<','
+							<<r << ','
+							<<endl;
+					}
+				}
+			}
+			clock_t t = clock() - start;
+			cout << "The execution lasts for "<< (float)t /CLOCKS_PER_SEC <<" s (CPU time)."<<endl;
+			cout << "there are in total " << err << " errors."<<endl;
+			cout << "the ave error is " << ave/TT << " ."<<endl;
 		}
 		catch (cl::Error err)
 		{
-			if (err.err() == CL_BUILD_PROGRAM_FAILURE)
-			{
-				string info;
-				program.getBuildInfo(devices[0],CL_PROGRAM_BUILD_LOG, &info);
-				cout << info << endl;
-				return EXIT_FAILURE;
-			}
-			else throw err;
+			cerr
+				<< "Error:\t"
+				<< err.what()
+				<< endl;
+
+			return EXIT_FAILURE;
 		}
 
-		cl::CommandQueue commandQueue(context, devices[0]);
-
-		//		typedef cl::make_kernel<cl::Buffer,cl::Buffer,float,float,float,float,float,float,float,float,float,float,float> kernelType;
-		//		kernelType kernelFunctor = kernelType(program, Params::kernel_name);
-
-		cl::Kernel kernel(program,Params::kernel_name);
-		auto kernelFunctor = cl::KernelFunctor<cl::Buffer,cl::Buffer>(kernel);
-
-
-		cl::Buffer d_im(context, CL_MEM_USE_HOST_PTR | CL_MEM_READ_ONLY,
-				sizeof(float)*D*D*C, h_im.data());
-		cl::Buffer d_out(context, CL_MEM_USE_HOST_PTR | CL_MEM_WRITE_ONLY,
-				sizeof(float)*N, h_out.data());
-		std::vector<cl::Memory> inBufVec, outBufVec;
-		inBufVec.push_back(d_im);
-		outBufVec.push_back(d_out);
-		commandQueue.enqueueMigrateMemObjects(inBufVec,0);
-		clock_t start = clock();
-		cl::EnqueueArgs enqueueArgs(commandQueue,cl::NDRange(1),cl::NDRange(1));
-		cl::Event event = kernelFunctor(enqueueArgs,
-				d_im,d_out
-				);
-
-		commandQueue.enqueueMigrateMemObjects(outBufVec,CL_MIGRATE_MEM_OBJECT_HOST);
-		commandQueue.finish();
-		event.wait();
-
-		clock_t t = clock() - start;
-		cout << "The execution lasts for "<< (float)t /CLOCKS_PER_SEC <<" s (CPU time)."<<endl;
-		for(int k=0;k<N;k++){
-			float r = *(ref+k);
-			float output = h_out[k];
-			if(r == 0.0){
-				TT --;
-				if(output == 0.0)
-					continue;
-				else
-					err ++;
-			}
-			float diff = abs(output / r - 1);// ref[i][j][k]);
-			ave+=diff;
-			if (diff > 1e-1)
-				err ++;
-			cout	<<k<<','
-				<<output<<','
-				<<r << ','
-				<<endl;
-		}
-		cout << "there are in total " << err << " errors."<<endl;
-		cout << "the ave error is " << ave/TT << " ."<<endl;
-	}
-	catch (cl::Error err)
-	{
-		cerr
-			<< "Error:\t"
-			<< err.what()
-			<< endl;
-
-		return EXIT_FAILURE;
-	}
-
-	if(err ==0 )
-		return EXIT_SUCCESS;
-	else
-		return EXIT_FAILURE;
+		if(err ==0 )
+			return EXIT_SUCCESS;
+		else
+			return EXIT_FAILURE;
 
 }
