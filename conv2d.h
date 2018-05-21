@@ -15,24 +15,26 @@ struct CE_LOG2<0>{
 	static const unsigned int V = 0;
 };
 
-template<typename T, int D, int C, int P, int IIs>
+template<int D, int C, int P, int IIs, int REP, typename T>
 void padding(hls::stream<T> fmap[C], hls::stream<T> omap[C]){
 #pragma HLS INLINE
-	
-	for(int i=0;i<D + 2*P;i++)
-		for(int j=0;j<D + 2*P;j++){
+
+	for(int rep = 0; rep < REP; rep++){
+		for(int i=0;i<D + 2*P;i++)
+			for(int j=0;j<D + 2*P;j++){
 #pragma HLS PIPELINE
-			bool pad = (i < P) || (i >= D + P) || (j < P) || (j >= D + P);
-			for(int c=0;c<C;c++){
-				if(pad)
-					omap[c].write(0);
-				else
-					omap[c].write(fmap[c].read());
+				bool pad = (i < P) || (i >= D + P) || (j < P) || (j >= D + P);
+				for(int c=0;c<C;c++){
+					if(pad)
+						omap[c].write(0);
+					else
+						omap[c].write(fmap[c].read());
+				}
 			}
-		}
+	}
 }
 
-template<typename T_IN, typename T_W, typename T_OUT, int D, int C, int K, int S, int IIs>
+template< int D, int C, int K, int S, int IIs,int REP, typename T_IN, typename T_W, typename T_OUT>
 void conv2d_3x3(hls::stream<T_IN> fmap[C], const T_W kernel[3][3][C][K], hls::stream<T_OUT> omap[K]){
 #pragma HLS ARRAY_PARTITION variable=kernel complete dim=0
 
@@ -41,50 +43,52 @@ void conv2d_3x3(hls::stream<T_IN> fmap[C], const T_W kernel[3][3][C][K], hls::st
 	static const int nD = (D - 3)/S + 1;
 	T_IN buffer[2][D][C];
 #pragma HLS ARRAY_PARTITION variable=buffer complete dim=3
-//#pragma HLS ARRAY_PARTITION variable=buffer complete dim=1
+	//#pragma HLS ARRAY_PARTITION variable=buffer complete dim=1
 	T_IN crop[3][3][C];
 #pragma HLS ARRAY_PARTITION variable=crop complete dim=0
 	typedef typename hls::x_traits<T_IN, T_W>::MULT_T MULT_T;
 	typedef typename hls::x_traits<MULT_T, ap_uint<CE_LOG2<9>::V> >::MULT_T SUM_T;
 	SUM_T sum[K];
 #pragma HLS ARRAY_PARTITION variable=sum complete dim=0
-	for(int i=0;i<D;i++){
-		for(int j=0;j<D;j++){
+	for(int rep = 0; rep < REP; rep++){
+		for(int i=0;i<D;i++){
+			for(int j=0;j<D;j++){
 #pragma HLS PIPELINE II=IIs
-			int ci = (i & 0x01);
-			bool b_out = ((i-2) % S == 0) && ((j - 2) % S == 0);
-			for(int c = 0;c<C;c++){
+				int ci = (i & 0x01);
+				bool b_out = (i >=2) && (j >=2) && ((i-2) % S == 0) && ((j - 2) % S == 0);
+				for(int c = 0;c<C;c++){
 #pragma HLS PIPELINE
-				// crop shift left
-				for(int si = 0; si <3;si++)
-					for(int sj = 0; sj <2;sj++)
+					// crop shift left
+					for(int si = 0; si <3;si++)
+						for(int sj = 0; sj <2;sj++)
 #pragma HLS PIPELINE
-						crop[si][sj][c] = crop[si][sj+1][c];
-				// crop read buffer
-				for(int si = 0; si < 2;si++){
+							crop[si][sj][c] = crop[si][sj+1][c];
+					// crop read buffer
+					for(int si = 0; si < 2;si++){
 #pragma HLS PIPELINE
-					int bi = (ci + si) & 0x01;
-					crop[si][2][c] = buffer[bi][j][c];
+						int bi = (ci + si) & 0x01;
+						crop[si][2][c] = buffer[bi][j][c];
+					}
+					// read from fmap and put to crop and buffer
+					crop[2][2][c] = fmap[c].read();
+					buffer[ci][j][c] = crop[2][2][c];
 				}
-				// read from fmap and put to crop and buffer
-				crop[2][2][c] = fmap[c].read();
-				buffer[ci][j][c] = crop[2][2][c];
-			}
-			for(int k=0;k<K;k++){
+				for(int k=0;k<K;k++){
 #pragma HLS PIPELINE
-				sum[k] = 0;
-				for(int c = 0;c<C;c++)
-					for(int fi = 0; fi<3;fi++)
-						for(int fj = 0; fj<3;fj++)
-							sum[k] += crop[fi][fj][c] * kernel[fi][fj][c][k];
-				if(j>=2 && i>=2 && b_out)
-					omap[k].write((T_OUT)sum[k]);
+					sum[k] = 0;
+					for(int c = 0;c<C;c++)
+						for(int fi = 0; fi<3;fi++)
+							for(int fj = 0; fj<3;fj++)
+								sum[k] += crop[fi][fj][c] * kernel[fi][fj][c][k];
+					if(b_out)
+						omap[k].write((T_OUT)sum[k]);
+				}
 			}
 		}
 	}
 
 }
-template<typename T_IN, typename T_W, typename T_OUT, int D, int C, int F, int K, int S, int IIs>
+template<int D, int C, int F, int K, int S, int IIs, typename T_IN, typename T_W, typename T_OUT>
 void conv2d(hls::stream<T_IN> fmap[C], const T_W kernel[F][F][C][K], hls::stream<T_OUT> omap[K]){
 
 #pragma HLS INLINE
@@ -98,14 +102,6 @@ void conv2d(hls::stream<T_IN> fmap[C], const T_W kernel[F][F][C][K], hls::stream
 	typedef typename hls::x_traits<T_IN, T_W>::MULT_T MULT_T;
 	typedef typename hls::x_traits<MULT_T, ap_uint<CE_LOG2<F*F>::V> >::MULT_T SUM_T;
 	SUM_T sum[K];
-//#pragma HLS ARRAY_PARTITION variable=sum complete dim=0
-/*
-	for(int i=0;i<F-1;i++)
-		for(int j=0;j<D;j++)
-			for(int c=0;c<C;c++)
-#pragma HLS PIPELINE
-				buffer[i][j][c] = fmap[c].read();
-*/
 	for(int i=0, ci = 0;i<D;ci++, i++){
 		for(int j=0;j<D;j++){
 #pragma HLS PIPELINE II=IIs
