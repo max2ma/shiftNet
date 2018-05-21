@@ -29,7 +29,7 @@ void shift(float *input, float *output){
 		static const int DIM_2 = 8;
 		static const int DIM_3 = 1;
 		static const int REX = 16;
-		static const int REP = 2;
+		static const int REP = 32;
 
 
 #pragma HLS DATAFLOW
