@@ -36,7 +36,7 @@ void shift(float *input, float *output){
 		// M2S
 		hls::stream<DataType> s_ten[C];
 		
-		M2S<DIM_0, C, REP>(input, s_ten);
+		M2S<DIM_0 * DIM_0, C, REP>(input, s_ten);
 		// 3x3 conv2d
 		hls::stream<DataType> s_conv[CHAN_0], s_pad[C], s_convBias[CHAN_0], s_relu[CHAN_0];
 		padding<D, C, 1, REX, REP>(s_ten, s_pad);
