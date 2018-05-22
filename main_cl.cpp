@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include "xcl2.hpp"
 #include "para.h"
+#include "loss.h"
 using namespace std;
 using namespace para;
 
@@ -79,20 +80,22 @@ int main(int argc, char** argv)
 		//#include "t_im"
 	};
 
+	float out[N];
 	float ref[BATCH][N] = {
 		//#include "t_l1"
 #include "outputs_batch_32"
 		//#include "t_cifar"
 	};
-	int err = 0, TT =N;
-	float ave = 0;
-	vector<float, aligned_allocator<float> > h_im(D*D*C), h_out(BATCH * N);
+	int targets[BATCH]={
+#include "targets_batch_32"
+	};
+	vector<float, aligned_allocator<float> > h_im(BATCH * D*D*C), h_out(BATCH * N);
 
 	for(int b=0;b<BATCH;b++)
 		for(int i=0;i<D;i++)
 			for(int j=0;j<D;j++)
 				for(int c=0;c<C;c++)
-					h_im[i*D*C+j*C+c]=input[b][i][j][c];
+					h_im[b *D*D*C + i*D*C+j*C+c]=input[b][i][j][c];
 	try
 	{
 		vector<cl::Platform> platforms;
@@ -121,9 +124,6 @@ int main(int argc, char** argv)
 
 		cl::CommandQueue commandQueue(context, devices[0]);
 
-		//		typedef cl::make_kernel<cl::Buffer,cl::Buffer,float,float,float,float,float,float,float,float,float,float,float> kernelType;
-		//		kernelType kernelFunctor = kernelType(program, Params::kernel_name);
-
 		cl::Kernel kernel(program,Params::kernel_name);
 		auto kernelFunctor = cl::KernelFunctor<cl::Buffer,cl::Buffer>(kernel);
 
@@ -146,31 +146,21 @@ int main(int argc, char** argv)
 		commandQueue.enqueueMigrateMemObjects(outBufVec,CL_MIGRATE_MEM_OBJECT_HOST);
 		commandQueue.finish();
 		event.wait();
+		
+		
+		int cor = 0;
+		for(int b=0; b < BATCH;b++){
+			for(int k=0;k<N;k++){
+				out[k]= h_out[b *N + k];
+			}
 
-		for(int k=0;k<h_out.size();k++){
-			float r = *(ref[b]+k);
-			float output = h_out[k];
-			if(r == 0.0){
-				TT --;
-				if(output == 0.0)
-					continue;
-				else
-					err ++;
-			}
-			float diff = abs(output / r - 1);// ref[i][j][k]);
-			ave+=diff;
-			if (diff > 1e-1){
-				err ++;
-				cout	<<k<<','
-					<<output<<','
-					<<r << ','
-					<<endl;
-			}
+			int ord = ord_max<N>(out);
+			if(ord == targets[b])
+				cor++;
 		}
+		cout << "The accuracy is " << (float)cor / (float)BATCH * 100.0f<< "%."<<endl;
 		clock_t t = clock() - start;
 		cout << "The execution lasts for "<< (float)t /CLOCKS_PER_SEC <<" s (CPU time)."<<endl;
-		cout << "there are in total " << err << " errors."<<endl;
-		cout << "the ave error is " << ave/TT << " ."<<endl;
 	}
 	catch (cl::Error err)
 	{
@@ -182,9 +172,6 @@ int main(int argc, char** argv)
 		return EXIT_FAILURE;
 	}
 
-	if(err ==0 )
-		return EXIT_SUCCESS;
-	else
-		return EXIT_FAILURE;
+	return EXIT_SUCCESS;
 
 }
