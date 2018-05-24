@@ -1,19 +1,8 @@
 #pragma once
 #include "utils/x_hls_traits.h"
 #include "hls_stream.h"
+#include "log2.h"
 
-template<unsigned int VALUE>
-struct CE_LOG2{
-	static const unsigned int V = CE_LOG2<(VALUE >> 1)>::V + 1;
-};
-template<>
-struct CE_LOG2<1>{
-	static const unsigned int V = 1;
-};
-template<>
-struct CE_LOG2<0>{
-	static const unsigned int V = 0;
-};
 
 template<int D, int C, int P, int IIs, int REP, typename T>
 void padding(hls::stream<T> fmap[C], hls::stream<T> omap[C]){
@@ -34,6 +23,7 @@ void padding(hls::stream<T> fmap[C], hls::stream<T> omap[C]){
 	}
 }
 
+
 template< int D, int C, int K, int S, int IIs,int REP, typename T_IN, typename T_W, typename T_OUT>
 void conv2d_3x3(hls::stream<T_IN> fmap[C], const T_W kernel[3][3][C][K], hls::stream<T_OUT> omap[K]){
 #pragma HLS ARRAY_PARTITION variable=kernel complete dim=0
@@ -47,7 +37,7 @@ void conv2d_3x3(hls::stream<T_IN> fmap[C], const T_W kernel[3][3][C][K], hls::st
 	T_IN crop[3][3][C];
 #pragma HLS ARRAY_PARTITION variable=crop complete dim=0
 	typedef typename hls::x_traits<T_IN, T_W>::MULT_T MULT_T;
-	typedef typename hls::x_traits<MULT_T, ap_uint<CE_LOG2<9>::V> >::MULT_T SUM_T;
+	typedef typename hls::x_traits<MULT_T, ap_uint<CE_LOG2<9 * C>::V> >::MULT_T SUM_T;
 	SUM_T sum[K];
 #pragma HLS ARRAY_PARTITION variable=sum complete dim=0
 	for(int rep = 0; rep < REP; rep++){
@@ -100,7 +90,7 @@ void conv2d(hls::stream<T_IN> fmap[C], const T_W kernel[F][F][C][K], hls::stream
 	T_IN crop[F][F][C];
 #pragma HLS ARRAY_PARTITION variable=crop complete dim=0
 	typedef typename hls::x_traits<T_IN, T_W>::MULT_T MULT_T;
-	typedef typename hls::x_traits<MULT_T, ap_uint<CE_LOG2<F*F>::V> >::MULT_T SUM_T;
+	typedef typename hls::x_traits<MULT_T, ap_uint<CE_LOG2<C *F*F>::V> >::MULT_T SUM_T;
 	SUM_T sum[K];
 	for(int i=0, ci = 0;i<D;ci++, i++){
 		for(int j=0;j<D;j++){
