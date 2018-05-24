@@ -6,7 +6,7 @@
 #include "dataType.h"
 #include "para.h"
 using namespace para;
-#include "quantized_weights.h"
+#include "weights.h"
 using namespace net;
 
 extern "C"
