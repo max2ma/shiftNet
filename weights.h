@@ -16,7 +16,7 @@ namespace net{
 	
 	typedef ap_fixed<8, 0, AP_RND, AP_SAT> T_P0; // for [-0.5, 0.5)
 	typedef ap_fixed<8, 1, AP_RND, AP_SAT> T_P1; // for [-1, 1)
-	typedef ap_fixed<8, 2, AP_RND, AP_SAT> T_P2; // for[-2, 2)
+	typedef ap_fixed<8, 2, AP_RND, AP_SAT> T_P2; // for [-2, 2)
 	typedef ap_fixed<8, 3, AP_RND, AP_SAT> T_P3; // for [-4, 4)
 	typedef ap_fixed<8, 4, AP_RND, AP_SAT> T_P4; // for [-8, 8)
 	typedef ap_fixed<8, 5, AP_RND, AP_SAT> T_P5; // for [-16, 16)
