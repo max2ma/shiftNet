@@ -1,5 +1,5 @@
 # shiftNet
-This repository contains a basic implementation of shift-based Resnet 20 <a href="https://arxiv.org/abs/1711.08141" target="_blank"> Shift-based Resnet </a> on the FPGA via High-level synthesis. 
+This repository contains a basic implementation of <a href="https://arxiv.org/abs/1711.08141" target="_blank"> Shift-based Resnet 20 </a> on the FPGA via High-level synthesis. 
 
 The 'AWS' branch could run on Amazon EC2 instance. For example:
   ```
@@ -10,5 +10,8 @@ The 'AWS' branch could run on Amazon EC2 instance. For example:
   make TARGETS=sw_emu DEVICES=$PLATFORM all
   ```
 
-The Accuracy of this network on 10000 test case of Cifar10 is 84.45% under the 8-bits weights
-quantization for weights and biases. 
+# Quantization
+
+The Accuracy of this network on 10000 test image from <a href="https://www.cs.toronto.edu/~kriz/cifar.html" target="_blank"> Cifar 10 </a> is 85.66% under the 8-bits weights
+quantization for weights and biases. The accuracy of the original implementation
+is 86.84%. 
