@@ -285,7 +285,7 @@ namespace MulChan{
 
 #pragma HLS INLINE
 			hls::stream<T_IN> f_in0[IP], f_in1[IP];
-#pragma HLS STREAM VARIABLE=f_in1 DEPTH=D*2*REP
+#pragma HLS STREAM VARIABLE=f_in1 DEPTH=D*2
 			_duplicate<D, IP, REP>(input, f_in0, f_in1);
 
 			hls::stream<T_S> f_conv0[MP], f_bias0[MP], f_relu[MP],f_shift[MP];
@@ -317,7 +317,7 @@ namespace MulChan{
 
 #pragma HLS INLINE
 			hls::stream<T_IN> f_in0[IP], f_in1[IP];
-#pragma HLS STREAM VARIABLE=f_in1 DEPTH=D*2*REP
+#pragma HLS STREAM VARIABLE=f_in1 DEPTH=D*2
 			_duplicate< D, IP, REP>(input, f_in0, f_in1);
 
 			hls::stream<T_S> f_conv0[MP],f_bias0[MP], f_shift[MP], f_relu[MP];
